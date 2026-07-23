@@ -17,6 +17,56 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Add the first complete Lean market-scan engine · Codex
+**Why:** A venue-verified universe is useful only when it can turn fresh,
+unit-safe market evidence into a small set of honest operator review items. The
+scan also needed to preserve the product's unknown-catalyst policy without
+borrowing the full Event Alpha pipeline.
+**Changes:**
+- Added the cadence- and authorization-gated no-send scan. The live boundary
+  performs at most one CoinGecko market-list request ordered by 24-hour volume;
+  local genuine snapshots require an explicit aware clock and reject fixture,
+  test, mock, or replay paths.
+- Added closed market snapshots, rolling log-volume baselines, an explicitly
+  labeled cold-start turnover proxy, direct 1h/24h/7d percent-point returns, a
+  Wilder RSI calculation labeled as an untimestamped sparkline-point proxy,
+  BTC/ETH-relative context, freshness, liquidity, spread, and chase risk. The
+  engine refuses to manufacture exact 4h context from array position; units and
+  plausible bounds fail closed.
+- Added deterministic one-setup-per-asset detection for breakout, relative
+  strength, pullback/mean reversion, rapid anomaly, exhaustion/fade review,
+  selloff risk, dashboard watch, and diagnostic cases. Suspicious low-liquidity,
+  stale, context-missing, and extreme-spread moves become diagnostics.
+- Added the four transparent operator scores and six-route projection. Unknown
+  catalyst lowers confidence and raises risk without hiding a market-led idea;
+  unavailable spread is never invented and caps confidence/urgency. Bearish
+  output remains review-only wording.
+- Added one transactional snapshot/idea/health write, active-idea reads, scan
+  readiness/status truth, and `make lean-radar-scan`. No Event Alpha import,
+  artifact namespace, LLM, Telegram, execution, paper, or normal-RSI path was
+  added.
+- Updated the product contract, operator docs, durable decision, and roadmap to
+  distinguish direct data, proxies, warm-up, and provisional—not probabilistic—
+  screen scores.
+**Verify:** `tests/lean_radar` passes 29/29 with external pytest plugins disabled,
+including no-authorization and provider-failure call-boundary tests, cadence,
+direct-unit/proxy truth, warm baseline, all initial market setups, route/score
+semantics, transactional storage, and zero-side-effect counters. Python
+compileall passes for the package and tests; the product JSON parses; `git diff
+--check` passes. `make architecture-cleanliness-check` passes every non-size
+ownership/import/naming/path gate, with quantitative size inventory remaining
+advisory per project policy. An actual Make-driven genuine local import plus two
+offline scans completed with two snapshots, zero ideas, and no provider call or
+send. The first `verify-fast` exposed two stale pre-Lean pytest-path assertions
+and the sandbox's expected loopback-bind denial; the assertions were corrected,
+the exact dashboard concurrency test passed unchanged with loopback permission,
+and the clean rerun passed 3,944 pytest tests, alert render smoke, fixture
+backtest, and paper scoreboard in 184.75 seconds.
+**Notes/risks:** The scan is a usable offline/no-send vertical slice, not the
+finished product. Calendar/outcomes/health operations, the six-page dashboard,
+Telegram preview/dedupe, direct Bybit bars/spread/depth, and genuine outcome
+calibration remain pending. No live provider call occurred in this change.
+
 ## 2026-07-23 — Start Lean Crypto Radar with a strict universe and one runtime store · Codex
 **Why:** The operator deliberately simplified the product direction. The useful
 default should be a small Bybit-perpetual market radar, not another extension of

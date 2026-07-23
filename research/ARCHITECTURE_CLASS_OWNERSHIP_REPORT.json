@@ -1386,13 +1386,16 @@
       "class_names": [
         "BybitInstrument",
         "LeanIdea",
+        "MarketFeatures",
+        "MarketSnapshot",
+        "SetupDetection",
         "UniverseAsset"
       ],
       "exception_reason": "",
-      "max_class_line_count": 90,
+      "max_class_line_count": 102,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.lean_radar.models",
-      "public_class_count": 3,
+      "public_class_count": 6,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -1491,17 +1494,31 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 781,
+  "class_count": 785,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
+    {
+      "accepted_exception": false,
+      "class_name": "MarketSnapshot",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 78,
+      "module": "crypto_rsi_scanner.lean_radar.models",
+      "owner_note": "",
+      "public": true,
+      "qualname": "MarketSnapshot",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/models.py"
+    },
     {
       "accepted_exception": false,
       "class_name": "LeanIdea",
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 90,
+      "line_count": 102,
       "module": "crypto_rsi_scanner.lean_radar.models",
       "owner_note": "",
       "public": true,
@@ -1515,7 +1532,7 @@
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 284,
+      "line_count": 441,
       "module": "crypto_rsi_scanner.lean_radar.store",
       "owner_note": "",
       "public": true,
@@ -1566,7 +1583,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 5,
+  "classes_over_limit_count": 6,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_fade",
@@ -1574,9 +1591,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11364,
+  "function_count": 11409,
   "function_line_limit": 150,
-  "functions_over_150_lines": 36,
+  "functions_over_150_lines": 37,
   "functions_over_limit": [
     {
       "function_name": "_validate_closed_projection",
@@ -1859,16 +1876,24 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     },
     {
+      "function_name": "run_scan",
+      "line_count": 196,
+      "module": "crypto_rsi_scanner.lean_radar.scan",
+      "public": true,
+      "qualname": "run_scan",
+      "source_path": "crypto_rsi_scanner/lean_radar/scan.py"
+    },
+    {
       "function_name": "build_universe",
-      "line_count": 173,
+      "line_count": 181,
       "module": "crypto_rsi_scanner.lean_radar.universe",
       "public": true,
       "qualname": "build_universe",
       "source_path": "crypto_rsi_scanner/lean_radar/universe.py"
     }
   ],
-  "functions_over_limit_count": 36,
-  "generated_at": "2026-07-23T02:04:00.985319+00:00",
+  "functions_over_limit_count": 37,
+  "generated_at": "2026-07-23T02:35:46.951976+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3241,13 +3266,16 @@
       "class_names": [
         "BybitInstrument",
         "LeanIdea",
+        "MarketFeatures",
+        "MarketSnapshot",
+        "SetupDetection",
         "UniverseAsset"
       ],
       "exception_reason": "",
-      "max_class_line_count": 90,
+      "max_class_line_count": 102,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.lean_radar.models",
-      "public_class_count": 3,
+      "public_class_count": 6,
       "reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "resolution": "accepted_model_bundle"
     },
@@ -3494,15 +3522,29 @@
     "new_multi_public_class_module": "fails architecture gates unless registered as a model bundle",
     "public_class_over_75_lines": "advisory measurement only"
   },
-  "production_classes_over_limit": 5,
+  "production_classes_over_limit": 6,
   "production_classes_over_limit_rows": [
+    {
+      "accepted_exception": false,
+      "class_name": "MarketSnapshot",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 78,
+      "module": "crypto_rsi_scanner.lean_radar.models",
+      "owner_note": "",
+      "public": true,
+      "qualname": "MarketSnapshot",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/models.py"
+    },
     {
       "accepted_exception": false,
       "class_name": "LeanIdea",
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 90,
+      "line_count": 102,
       "module": "crypto_rsi_scanner.lean_radar.models",
       "owner_note": "",
       "public": true,
@@ -3516,7 +3558,7 @@
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 284,
+      "line_count": 441,
       "module": "crypto_rsi_scanner.lean_radar.store",
       "owner_note": "",
       "public": true,
@@ -3567,7 +3609,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 36,
+  "production_functions_over_limit": 37,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -3850,8 +3892,16 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     },
     {
+      "function_name": "run_scan",
+      "line_count": 196,
+      "module": "crypto_rsi_scanner.lean_radar.scan",
+      "public": true,
+      "qualname": "run_scan",
+      "source_path": "crypto_rsi_scanner/lean_radar/scan.py"
+    },
+    {
       "function_name": "build_universe",
-      "line_count": 173,
+      "line_count": 181,
       "module": "crypto_rsi_scanner.lean_radar.universe",
       "public": true,
       "qualname": "build_universe",
@@ -3980,7 +4030,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 525,
+  "public_class_count": 528,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -4213,7 +4263,7 @@
     "crypto_rsi_scanner.event_providers.tokenomist": 1,
     "crypto_rsi_scanner.lean_radar.bybit_universe": 1,
     "crypto_rsi_scanner.lean_radar.config": 1,
-    "crypto_rsi_scanner.lean_radar.models": 3,
+    "crypto_rsi_scanner.lean_radar.models": 6,
     "crypto_rsi_scanner.lean_radar.store": 1,
     "crypto_rsi_scanner.lean_radar.universe": 1,
     "crypto_rsi_scanner.llm_providers.base": 5,
@@ -4244,11 +4294,25 @@
   "remaining_class_ownership_debt": [
     {
       "accepted_exception": false,
+      "class_name": "MarketSnapshot",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 78,
+      "module": "crypto_rsi_scanner.lean_radar.models",
+      "owner_note": "",
+      "public": true,
+      "qualname": "MarketSnapshot",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/models.py"
+    },
+    {
+      "accepted_exception": false,
       "class_name": "LeanIdea",
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 90,
+      "line_count": 102,
       "module": "crypto_rsi_scanner.lean_radar.models",
       "owner_note": "",
       "public": true,
@@ -4262,7 +4326,7 @@
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 284,
+      "line_count": 441,
       "module": "crypto_rsi_scanner.lean_radar.store",
       "owner_note": "",
       "public": true,
@@ -4271,7 +4335,7 @@
       "source_path": "crypto_rsi_scanner/lean_radar/store.py"
     }
   ],
-  "remaining_class_ownership_debt_count": 2,
+  "remaining_class_ownership_debt_count": 3,
   "research_only": true,
   "row_type": "architecture_class_ownership_report",
   "schema_version": "architecture_class_ownership_report_v1",
@@ -4346,7 +4410,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 36,
+      "functions_over_150_lines": 37,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -4669,7 +4733,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 36,
+    "functions_over_150_lines": 37,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,

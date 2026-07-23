@@ -2224,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 5519,
+          "line": 5540,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2262,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 5519,
+          "line": 5540,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 17854,
+          "line": 17936,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-23T02:03:51.511611+00:00",
+  "generated_at": "2026-07-23T02:35:37.503586+00:00",
   "include_runtime_artifacts": false,
-  "input_file_count": 1283,
-  "input_fingerprint": "826bfbfe57dc4c85fc6dff136467c3b90e9792f7a56567ef2c27e4194cdb3227",
+  "input_file_count": 1290,
+  "input_fingerprint": "ea77f4bedb39fc40c3f0e1c9bd5917fd694e64c0335d7633f9196210624b33b8",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "crypto_rsi_scanner/lean_radar/config.py:1784772218",
-    "crypto_rsi_scanner/lean_radar/models.py:1784772218",
-    "crypto_rsi_scanner/lean_radar/store.py:1784772218",
-    "crypto_rsi_scanner/lean_radar/universe.py:1784772219",
-    "crypto_rsi_scanner/project_health/class_ownership.py:1784772219"
+    "AGENTS.md:1784773951",
+    "DECISIONS.md:1784773951",
+    "DEVLOG.md:1784773952",
+    "README.md:1784773951",
+    "ROADMAP.md:1784773952"
   ],
-  "newest_source_mtime": 1784772228.707644,
+  "newest_source_mtime": 1784774134.7117968,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784772151.200793,
+  "report_mtime": 1784773505.7738066,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2509,28 +2509,28 @@
     "cache_status": "miss",
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
-    "input_file_count": 1283,
-    "input_fingerprint": "826bfbfe57dc4c85fc6dff136467c3b90e9792f7a56567ef2c27e4194cdb3227",
+    "input_file_count": 1290,
+    "input_fingerprint": "ea77f4bedb39fc40c3f0e1c9bd5917fd694e64c0335d7633f9196210624b33b8",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "crypto_rsi_scanner/lean_radar/config.py:1784772218",
-      "crypto_rsi_scanner/lean_radar/models.py:1784772218",
-      "crypto_rsi_scanner/lean_radar/store.py:1784772218",
-      "crypto_rsi_scanner/lean_radar/universe.py:1784772219",
-      "crypto_rsi_scanner/project_health/class_ownership.py:1784772219"
+      "AGENTS.md:1784773951",
+      "DECISIONS.md:1784773951",
+      "DEVLOG.md:1784773952",
+      "README.md:1784773951",
+      "ROADMAP.md:1784773952"
     ],
-    "newest_source_mtime": 1784772228.707644,
+    "newest_source_mtime": 1784774134.7117968,
     "regex_compile_count": 124,
-    "report_mtime": 1784772151.200793,
-    "scan_duration_seconds": 2.5183,
+    "report_mtime": 1784773505.7738066,
+    "scan_duration_seconds": 2.5197,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 80,
     "scanned_makefile_files": 1,
     "scanned_script_files": 4,
-    "scanned_source_files": 928,
-    "scanned_test_files": 269,
+    "scanned_source_files": 934,
+    "scanned_test_files": 270,
     "skipped_artifact_files": 4779,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -2558,10 +2558,10 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.5183,
+  "scan_duration_seconds": 2.5197,
   "scanned_doc_files": 80,
-  "scanned_source_files": 928,
-  "scanned_test_files": 269,
+  "scanned_source_files": 934,
+  "scanned_test_files": 270,
   "schema_version": "event_alpha_old_import_check_v1",
   "skipped_artifact_files": 4779,
   "skipped_dirs": 69,

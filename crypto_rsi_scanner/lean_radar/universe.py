@@ -50,8 +50,12 @@ class LeanUniverseResult:
         }
 
 
-def load_market_rows(path: Path) -> tuple[Mapping[str, object], ...]:
-    payload, _digest = read_json_document(path)
+def load_market_rows(
+    path: Path,
+    *,
+    require_genuine: bool = False,
+) -> tuple[Mapping[str, object], ...]:
+    payload, _digest = read_json_document(path, require_genuine=require_genuine)
     if not isinstance(payload, list):
         raise LeanUniverseError("market rows must be a JSON array")
     if len(payload) > 1_000:
@@ -77,6 +81,7 @@ def build_universe(
         reason = exclusion_reason(row)
         volume = _finite_positive(row.get("total_volume"))
         price = _finite_positive(row.get("current_price"))
+        market_cap = _finite_positive(row.get("market_cap"))
         canonical_id = row.get("id")
         symbol = row.get("symbol")
         name = row.get("name")
@@ -89,7 +94,13 @@ def build_universe(
         if price is None:
             excluded["missing_price"] += 1
             continue
-        if not all(isinstance(value, str) and value.strip() for value in (canonical_id, symbol, name)):
+        if market_cap is None:
+            excluded["missing_market_cap"] += 1
+            continue
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (canonical_id, symbol, name)
+        ):
             excluded["missing_identity"] += 1
             continue
         clean.append({
@@ -98,6 +109,7 @@ def build_universe(
             "symbol": str(symbol).strip().upper(),
             "name": str(name).strip(),
             "_volume": volume,
+            "_market_cap": market_cap,
         })
     clean.sort(
         key=lambda row: (

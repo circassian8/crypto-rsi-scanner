@@ -59,6 +59,9 @@ class CoinGeckoClient:
     async def get_top_markets(self, n: int) -> list[dict]:
         return await get_top_markets(self, n)
 
+    async def get_top_markets_by_volume(self, n: int) -> list[dict]:
+        return await get_top_markets_by_volume(self, n)
+
     async def get_market_chart(self, coin_id: str, days: int) -> dict:
         return await get_market_chart(self, coin_id, days)
 
@@ -232,6 +235,34 @@ async def get_top_markets(self: CoinGeckoClient, n: int) -> list[dict]:
             "page": 1,
             "sparkline": "true",
             "price_change_percentage": "24h,7d",
+        },
+    )
+
+
+async def get_top_markets_by_volume(self: CoinGeckoClient, n: int) -> list[dict]:
+    if self._fixture_dir is not None:
+        data = self._fixture_json("top_markets.json")
+        if not isinstance(data, list):
+            raise RuntimeError(
+                f"fixture top_markets.json must contain a list: {self._fixture_dir}"
+            )
+        rows = [row for row in data if isinstance(row, dict)]
+        rows.sort(
+            key=lambda row: (
+                -float(row.get("total_volume", 0) or 0),
+                str(row.get("id", "")),
+            )
+        )
+        return rows[:n]
+    return await self._get(
+        "/coins/markets",
+        {
+            "vs_currency": "usd",
+            "order": "volume_desc",
+            "per_page": min(n, 250),
+            "page": 1,
+            "sparkline": "true",
+            "price_change_percentage": "1h,24h,7d",
         },
     )
 

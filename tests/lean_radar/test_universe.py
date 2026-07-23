@@ -61,3 +61,20 @@ def test_without_catalog_no_asset_is_silently_tradable() -> None:
     assert result.status == "bybit_catalog_missing"
     assert result.active_assets == ()
     assert all(row.bybit_instrument is None for row in result.blocked_assets)
+
+
+def test_missing_market_cap_is_excluded_before_snapshot_normalization() -> None:
+    instruments = load_catalog(
+        ROOT / "fixtures/bybit_execution_quality/instruments_info.json",
+        source_mode="fixture",
+    )
+    markets = list(
+        load_market_rows(ROOT / "fixtures/coingecko_smoke/top_markets.json")
+    )
+    bitcoin = next(row for row in markets if row["id"] == "bitcoin")
+    bitcoin["market_cap"] = None
+
+    result = build_universe(markets, instruments)
+
+    assert all(row.symbol != "BTC" for row in result.active_assets)
+    assert result.exclusion_counts["missing_market_cap"] == 1

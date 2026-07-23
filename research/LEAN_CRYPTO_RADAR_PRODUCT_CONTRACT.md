@@ -1,8 +1,8 @@
 # Lean Crypto Radar V1 Product Contract
 
-Status: active product rebuild. The universe/store foundation is implemented;
-the scan, dashboard, Telegram preview, calendar, and outcome slices remain in
-progress.
+Status: active product rebuild. The universe/store and market-scan engine are
+implemented; the dashboard, Telegram preview, calendar, and outcome slices
+remain in progress.
 
 ## Product
 
@@ -45,6 +45,30 @@ The six routes are `urgent_review`, `watchlist`, `daily_digest`,
 
 The only main scores are actionability, confidence, risk, and urgency. They are
 operator-priority summaries on a 0–100 scale, not win probabilities.
+
+## Implemented scan contract
+
+One scan first proves the local Bybit catalog, source mode, explicit live
+authorization, and 15–30-minute cadence. Only then may the live path make one
+bounded CoinGecko `/coins/markets` request ordered by `volume_desc`. The request
+uses the endpoint's direct 1-hour, 24-hour, and 7-day percentage fields plus its
+7-day sparkline. Wilder-14 RSI is explicitly labeled as a calculation over
+untimestamped sparkline points. No 4-hour return is derived from array position;
+exact 4-hour context remains unavailable until timestamped bars are collected.
+
+The store builds a rolling log-volume baseline after eight prior observations.
+Before that baseline is warm, a cross-sectional turnover z-score is labeled as
+a cold-start attention proxy. BTC/ETH-relative returns, freshness, minimum
+liquidity, spread availability, and chase risk remain separate evidence.
+
+The detector chooses at most one setup per asset. Stale data, missing minimum
+return context, suspicious low-liquidity pumps, and known extreme spread become
+hidden diagnostics. Valid market-led setups are scored once with the four
+operator scores and persisted atomically with the snapshots and scan health.
+Unknown catalyst remains visible with lower confidence and higher risk. Missing
+spread caps confidence and urgency. The initial rules are transparent V1 screens
+to be evaluated through outcomes; they are not estimated win probabilities and
+must not be tuned against sparse examples.
 
 ## Hard gates and soft limitations
 
@@ -90,10 +114,23 @@ CONFIRM=1 make lean-radar-bybit-universe-import \
 make lean-radar-universe \
   LEAN_RADAR_MARKET_ROWS=/absolute/path/to/coingecko-markets.json \
   PYTHON=.venv/bin/python
+make lean-radar-scan PYTHON=.venv/bin/python
+```
+
+The live scan command respects the already-present CoinGecko authorization and
+returns non-success before a provider call when authorization, catalog, or
+cadence readiness is absent. For a genuine offline snapshot:
+
+```sh
+make lean-radar-scan \
+  LEAN_RADAR_MARKET_MODE=imported_snapshot \
+  LEAN_RADAR_MARKET_ROWS=/absolute/path/to/coingecko-markets.json \
+  LEAN_RADAR_MARKET_OBSERVED_AT=2026-07-23T12:00:00Z \
+  PYTHON=.venv/bin/python
 ```
 
 Readiness is observational and makes no provider call or database write. The
-catalog import is a confirmed local operation and rejects checked-in fixture,
+catalog import and genuine market-snapshot import reject checked-in fixture,
 test, mock, or replay paths. Until the remaining vertical slices land, the
 legacy Decision Radar commands remain available for research operations.
 

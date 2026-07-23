@@ -181,6 +181,15 @@ require a known catalyst to surface a liquid, timely market-led review item.
 - Do not add a lean feature unless it appears in the dashboard, Telegram
   preview, outcomes, health, or operator docs. Do not create a new artifact or
   evidence framework for this product.
+- `make lean-radar-readiness` is observational. `make lean-radar-scan` performs
+  at most one already-authorized, cadence-eligible CoinGecko market-list call,
+  ordered by 24-hour volume, and never sends. Genuine imported snapshots require
+  an explicit aware observation clock and reject fixture/test/mock/replay paths.
+  Direct 1h/24h/7d percentage fields remain direct; Wilder RSI is explicitly a
+  calculation over untimestamped 7-day-sparkline points. Never infer an exact
+  4h return from sparkline array position. The first eight observations are
+  baseline warm-up, not fabricated history. Missing spread caps confidence and
+  urgency rather than becoming an estimate.
 
 The durable product contract is
 `research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md` / `.json`. During the rebuild,

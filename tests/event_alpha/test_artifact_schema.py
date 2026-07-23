@@ -1471,7 +1471,10 @@ def test_event_alpha_cli_package_and_make_targets_are_available():
     assert "test-pytest-timed:" in makefile
     assert "test-pytest-durations:" in makefile
     assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in makefile
-    assert "PYTEST_PATHS ?= tests/event_alpha tests/rsi tests/cli tests/test_indicators.py" in makefile
+    assert (
+        "PYTEST_PATHS ?= tests/lean_radar tests/event_alpha tests/rsi tests/cli "
+        "tests/test_indicators.py"
+    ) in makefile
     assert "test-pytest-parallel:" in makefile
     assert "-p xdist.plugin" in makefile
     assert "event-alpha-namespace-lifecycle-report:" in makefile

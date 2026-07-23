@@ -5,7 +5,7 @@
   "default_operator_product": true,
   "implementation_state": {
     "bybit_universe_and_store_foundation": "implemented",
-    "scan_and_idea_detection": "in_progress",
+    "scan_and_idea_detection": "implemented",
     "dashboard": "pending",
     "telegram_preview": "pending",
     "calendar_and_outcomes": "pending"
@@ -23,6 +23,27 @@
     "default": 20,
     "minimum": 15,
     "maximum": 30
+  },
+  "market_scan": {
+    "live_provider": "coingecko_coins_markets",
+    "live_order": "volume_desc",
+    "live_request_bound": 1,
+    "direct_return_fields": [
+      "1h_percent_points",
+      "24h_percent_points",
+      "7d_percent_points"
+    ],
+    "proxy_fields": {
+      "rsi_14": "wilder_14_on_untimestamped_coingecko_7d_sparkline_points"
+    },
+    "unavailable_without_timestamped_bars": [
+      "exact_4h_return"
+    ],
+    "rolling_volume_baseline_minimum_samples": 8,
+    "cold_start_attention_proxy": "cross_sectional_turnover_zscore",
+    "one_setup_per_asset": true,
+    "atomic_snapshot_idea_health_write": true,
+    "provisional_rules_are_win_probabilities": false
   },
   "surfaces": {
     "dashboard_priority": "primary_equal",

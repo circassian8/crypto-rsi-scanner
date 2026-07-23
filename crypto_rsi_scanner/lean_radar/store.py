@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import json
 import os
 from pathlib import Path
 import sqlite3
 import stat
-from typing import Iterator, Sequence
+from typing import Iterator, Mapping, Sequence
 from urllib.parse import quote
 
-from .models import BybitInstrument
+from .models import BybitInstrument, LeanIdea, MarketSnapshot
 
 
 SCHEMA_VERSION = 1
@@ -215,6 +216,163 @@ class LeanRadarStore:
                 """
             ).fetchall()
         return tuple(dict(row) for row in rows)
+
+    def snapshot_history(
+        self,
+        canonical_asset_id: str,
+        *,
+        before: str,
+        limit: int = 128,
+    ) -> tuple[dict[str, object], ...]:
+        if not self.path.exists():
+            return ()
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT payload_json FROM market_snapshots
+                WHERE canonical_asset_id = ? AND observed_at < ?
+                ORDER BY observed_at DESC LIMIT ?
+                """,
+                (canonical_asset_id, before, max(1, min(limit, 256))),
+            ).fetchall()
+        parsed: list[dict[str, object]] = []
+        for row in reversed(rows):
+            value = json.loads(row["payload_json"])
+            if isinstance(value, dict):
+                parsed.append(value)
+        return tuple(parsed)
+
+    def last_scan_status(self) -> dict[str, object] | None:
+        if not self.path.exists():
+            return None
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM system_health WHERE component = 'scan'"
+            ).fetchone()
+        if row is None:
+            return None
+        payload = json.loads(row["payload_json"])
+        if not isinstance(payload, dict):
+            raise LeanRadarStoreError("stored scan health is invalid")
+        return payload
+
+    def record_health(
+        self,
+        component: str,
+        health: Mapping[str, object],
+    ) -> None:
+        if not isinstance(component, str) or not component.strip() or len(component) > 64:
+            raise LeanRadarStoreError("health component is invalid")
+        checked_at = health.get("checked_at")
+        status = health.get("status")
+        if not isinstance(checked_at, str) or not isinstance(status, str):
+            raise LeanRadarStoreError("health identity is invalid")
+        payload = json.dumps(
+            dict(health), sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+        with self.connect(write=True) as connection:
+            connection.execute(
+                """
+                INSERT INTO system_health (component, checked_at, status, payload_json)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(component) DO UPDATE SET
+                    checked_at = excluded.checked_at,
+                    status = excluded.status,
+                    payload_json = excluded.payload_json
+                """,
+                (component.strip(), checked_at, status, payload),
+            )
+            connection.commit()
+
+    def record_scan(
+        self,
+        snapshots: Sequence[MarketSnapshot],
+        ideas: Sequence[LeanIdea],
+        health: Mapping[str, object],
+    ) -> None:
+        checked_at = health.get("checked_at")
+        status = health.get("status")
+        if not isinstance(checked_at, str) or not isinstance(status, str):
+            raise LeanRadarStoreError("scan health identity is invalid")
+        snapshot_payloads = [
+            json.dumps(row.to_dict(), sort_keys=True, separators=(",", ":"), allow_nan=False)
+            for row in snapshots
+        ]
+        idea_payloads = [
+            json.dumps(row.to_dict(), sort_keys=True, separators=(",", ":"), allow_nan=False)
+            for row in ideas
+        ]
+        health_json = json.dumps(
+            dict(health), sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+        with self.connect(write=True) as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                connection.executemany(
+                    """
+                    INSERT INTO market_snapshots (
+                        canonical_asset_id, observed_at, source_mode, payload_json
+                    ) VALUES (?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            row.canonical_asset_id,
+                            row.observed_at,
+                            row.source_mode,
+                            payload,
+                        )
+                        for row, payload in zip(snapshots, snapshot_payloads)
+                    ],
+                )
+                connection.execute("UPDATE ideas SET active = 0 WHERE active = 1")
+                connection.executemany(
+                    """
+                    INSERT INTO ideas (
+                        idea_id, created_at, expires_at, active, payload_json
+                    ) VALUES (?, ?, ?, 1, ?)
+                    ON CONFLICT(idea_id) DO UPDATE SET
+                        expires_at = excluded.expires_at,
+                        active = 1,
+                        payload_json = excluded.payload_json
+                    """,
+                    [
+                        (
+                            row.idea_id,
+                            row.created_at,
+                            row.expires_at,
+                            payload,
+                        )
+                        for row, payload in zip(ideas, idea_payloads)
+                    ],
+                )
+                connection.execute(
+                    """
+                    INSERT INTO system_health (component, checked_at, status, payload_json)
+                    VALUES ('scan', ?, ?, ?)
+                    ON CONFLICT(component) DO UPDATE SET
+                        checked_at = excluded.checked_at,
+                        status = excluded.status,
+                        payload_json = excluded.payload_json
+                    """,
+                    (checked_at, status, health_json),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+
+    def list_active_ideas(self) -> tuple[dict[str, object], ...]:
+        if not self.path.exists():
+            return ()
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM ideas WHERE active = 1 ORDER BY created_at DESC, idea_id"
+            ).fetchall()
+        return tuple(
+            payload
+            for row in rows
+            if isinstance((payload := json.loads(row["payload_json"])), dict)
+        )
 
     def _migrate(self, connection: sqlite3.Connection) -> None:
         current = int(connection.execute("PRAGMA user_version").fetchone()[0])

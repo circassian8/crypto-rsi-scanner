@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Keep the first Lean scan transparent and point-in-time
+**Status:** accepted
+**Decision:** The Lean live scan requests one bounded CoinGecko market page in
+24-hour-volume order only after catalog, cadence, and existing authorization
+readiness pass. Preserve direct 1-hour, 24-hour, and 7-day percent-point fields;
+label Wilder-14 RSI as a calculation over untimestamped sparkline points, and
+do not manufacture an exact 4-hour return from array position. Require
+eight prior observations before calling the rolling volume baseline warm, and
+label the interim cross-sectional turnover measure as a cold-start proxy. Pick
+at most one setup per asset and expose only actionability, confidence, risk, and
+urgency as main scores. Unknown catalyst stays visible with a risk/confidence
+penalty; unavailable spread is never estimated and caps confidence/urgency.
+Persist snapshots, ideas, and scan health in one transaction. These initial
+thresholds are transparent screens, not win probabilities or validated edge.
+**Why:** The operator needs timely market-led attention without reviving the
+large artifact pipeline or pretending that proxy timing, missing execution
+quality, cold history, or heuristic scores are stronger evidence than they are.
+**Revisit when:** Genuine point-in-time outcomes and direct Bybit bars/spread
+observations are sufficient for a frozen, out-of-sample calibration review.
+Never tune the rules merely to increase current idea counts.
+
 ## 2026-07-23 - Make Lean Crypto Radar the default operator product
 **Status:** accepted
 **Decision:** Build the default operator path in the small

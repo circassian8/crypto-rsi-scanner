@@ -112,10 +112,13 @@ RADAR_MARKET_NO_SEND_FETCH_ARG = $(if $(strip $(RADAR_MARKET_NO_SEND_FETCH_LIMIT
 LEAN_RADAR_DB_PATH ?= $(abspath lean_radar.db)
 LEAN_RADAR_BYBIT_CATALOG ?=
 LEAN_RADAR_MARKET_ROWS ?=
+LEAN_RADAR_MARKET_MODE ?= live_no_send
+LEAN_RADAR_MARKET_OBSERVED_AT ?=
 LEAN_RADAR_WATCHLIST_ASSET_ID ?=
 LEAN_RADAR_WATCHLIST_SYMBOL ?=
 LEAN_RADAR_WATCHLIST_NOTE ?=
 LEAN_RADAR_MARKET_ROWS_ARG = $(if $(strip $(LEAN_RADAR_MARKET_ROWS)),--markets $(abspath $(LEAN_RADAR_MARKET_ROWS)),)
+LEAN_RADAR_MARKET_OBSERVED_AT_ARG = $(if $(strip $(LEAN_RADAR_MARKET_OBSERVED_AT)),--observed-at $(LEAN_RADAR_MARKET_OBSERVED_AT),)
 RADAR_MARKET_NO_SEND_PYTHON = $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
 RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 RADAR_DAILY_OPS_INTERVAL_SECONDS ?= 300
@@ -265,7 +268,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
 .PHONY: radar-unlock-tokenomist-v5-smoke radar-unlock-tokenomist-v5-capture-smoke radar-unlock-tokenomist-v5-readiness
-.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add
+.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan
 
 help:
 	@echo "Targets:"
@@ -296,6 +299,7 @@ help:
 	@echo "  make lean-radar-bybit-universe-readiness  Inspect the confirmed local Bybit USDT-perpetual catalog"
 	@echo "  CONFIRM=1 make lean-radar-bybit-universe-import LEAN_RADAR_BYBIT_CATALOG=/absolute/path/file.json  Import one genuine local catalog"
 	@echo "  make lean-radar-universe LEAN_RADAR_MARKET_ROWS=/absolute/path/markets.json  Intersect top-liquid assets and watchlist with confirmed Bybit perps"
+	@echo "  make lean-radar-scan  Run one already-authorized CoinGecko no-send scan; use LEAN_RADAR_MARKET_MODE=imported_snapshot with an explicit file and UTC clock for offline import"
 	@echo "  CONFIRM=1 make lean-radar-watchlist-add LEAN_RADAR_WATCHLIST_ASSET_ID=... LEAN_RADAR_WATCHLIST_SYMBOL=...  Add one blocked-until-verified watchlist asset"
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
@@ -1394,6 +1398,13 @@ lean-radar-watchlist-add:
 		--canonical-asset-id $(LEAN_RADAR_WATCHLIST_ASSET_ID) \
 		--symbol $(LEAN_RADAR_WATCHLIST_SYMBOL) \
 		--note "$(LEAN_RADAR_WATCHLIST_NOTE)" --confirm
+
+lean-radar-scan:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) scan \
+		--source-mode $(LEAN_RADAR_MARKET_MODE) \
+		$(LEAN_RADAR_MARKET_ROWS_ARG) $(LEAN_RADAR_MARKET_OBSERVED_AT_ARG)
 
 radar-dashboard:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \

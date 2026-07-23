@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import json
 from pathlib import Path
 import re
@@ -10,6 +11,8 @@ from typing import Mapping, Sequence
 
 from .bybit_universe import BybitUniverseError, load_catalog
 from .config import LeanRadarConfigError, load_settings
+from .market_data import MarketDataError, live_provider_authorized
+from .scan import run_scan, scan_readiness
 from .store import LeanRadarStore, LeanRadarStoreError
 from .universe import LeanUniverseError, build_universe, load_market_rows
 
@@ -39,6 +42,15 @@ def _parser() -> argparse.ArgumentParser:
     watchlist.add_argument("--symbol", required=True)
     watchlist.add_argument("--note", default="")
     watchlist.add_argument("--confirm", action="store_true")
+
+    scan = subparsers.add_parser("scan")
+    scan.add_argument(
+        "--source-mode",
+        choices=("live_no_send", "imported_snapshot", "fixture"),
+        default="live_no_send",
+    )
+    scan.add_argument("--markets", type=Path)
+    scan.add_argument("--observed-at", type=_time)
     return parser
 
 
@@ -48,7 +60,32 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
     store = LeanRadarStore(args.db or settings.db_path)
     if args.command in {"readiness", "bybit-readiness"}:
         catalog = store.catalog_status()
-        ready = catalog["status"] == "ready"
+        if args.command == "readiness":
+            scan_status = scan_readiness(
+                store,
+                settings,
+                source_mode="live_no_send",
+            )
+            ready = scan_status["status"] == "ready"
+        else:
+            scan_status = None
+            ready = catalog["status"] == "ready"
+        if catalog["status"] != "ready":
+            next_safe_command = (
+                "CONFIRM=1 make lean-radar-bybit-universe-import "
+                "LEAN_RADAR_BYBIT_CATALOG=/absolute/path/to/instruments-info.json"
+            )
+        elif args.command == "bybit-readiness":
+            next_safe_command = "make lean-radar-universe"
+        elif ready:
+            next_safe_command = "make lean-radar-scan"
+        elif not live_provider_authorized():
+            next_safe_command = (
+                "authorize CoinGecko under the existing provider policy, then run "
+                "make lean-radar-readiness"
+            )
+        else:
+            next_safe_command = "run make lean-radar-readiness after the reported cadence wait"
         payload = {
             "status": "ready" if ready else "setup_required",
             "product": "Lean Crypto Radar V1",
@@ -58,15 +95,12 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
             "top_liquid_limit": settings.top_liquid_limit,
             "cadence_minutes": settings.cadence_minutes,
             "bybit_catalog": catalog,
+            "scan_readiness": scan_status,
+            "live_provider_authorized": live_provider_authorized(),
             "provider_call_attempted": False,
             "telegram_send_attempted": False,
             "research_only": True,
-            "next_safe_command": (
-                "make lean-radar-universe"
-                if ready
-                else "CONFIRM=1 make lean-radar-bybit-universe-import "
-                "LEAN_RADAR_BYBIT_CATALOG=/absolute/path/to/instruments-info.json"
-            ),
+            "next_safe_command": next_safe_command,
         }
         return 0, payload
     if args.command == "bybit-import":
@@ -101,7 +135,11 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
         )
         instrument_bases = {row.base_coin for row in store.list_bybit_instruments()}
         return 0, {
-            "status": "active_pending_market_data" if symbol in instrument_bases else "blocked_unverified",
+            "status": (
+                "active_pending_market_data"
+                if symbol in instrument_bases
+                else "blocked_unverified"
+            ),
             "canonical_asset_id": canonical_id,
             "symbol": symbol,
             "bybit_usdt_perpetual_confirmed": symbol in instrument_bases,
@@ -125,6 +163,35 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
                 else "complete the reported readiness prerequisite"
             ),
         }
+    if args.command == "scan":
+        if args.source_mode == "live_no_send":
+            if args.markets is not None or args.observed_at is not None:
+                raise MarketDataError(
+                    "live scan does not accept local market rows or an observation clock"
+                )
+            result = run_scan(
+                store,
+                settings,
+                source_mode="live_no_send",
+            )
+            return (0 if result.get("status") == "complete" else 2), result
+        if args.markets is None or args.observed_at is None:
+            raise MarketDataError(
+                "local scan requires --markets and --observed-at"
+            )
+        rows = load_market_rows(
+            args.markets,
+            require_genuine=args.source_mode == "imported_snapshot",
+        )
+        result = run_scan(
+            store,
+            settings,
+            source_mode=args.source_mode,
+            rows=rows,
+            observed_at=args.observed_at,
+            evaluated_at=args.observed_at,
+        )
+        return (0 if result.get("status") == "complete" else 2), result
     raise AssertionError("unreachable command")
 
 
@@ -143,6 +210,11 @@ def render_summary(payload: Mapping[str, object]) -> str:
         lines.append(
             f"Active assets: {payload.get('active_asset_count', 0)} · "
             f"blocked/unverified: {payload.get('blocked_asset_count', 0)}"
+        )
+    if "snapshot_count" in payload:
+        lines.append(
+            f"Snapshots: {payload.get('snapshot_count', 0)} · "
+            f"ideas: {payload.get('idea_count', 0)}"
         )
     if payload.get("next_safe_command"):
         lines.append(f"Next: {payload['next_safe_command']}")
@@ -171,6 +243,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         forwarded.extend(("--note", args.note))
         if args.confirm:
             forwarded.append("--confirm")
+    elif args.command == "scan":
+        forwarded.extend(("--source-mode", args.source_mode))
+        if args.markets:
+            forwarded.extend(("--markets", str(args.markets)))
+        if args.observed_at:
+            forwarded.extend(("--observed-at", args.observed_at.isoformat()))
     try:
         code, payload = run(forwarded)
     except (
@@ -178,6 +256,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         LeanRadarConfigError,
         LeanRadarStoreError,
         LeanUniverseError,
+        MarketDataError,
     ) as exc:
         code = 2
         payload = {
@@ -193,6 +272,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         else render_summary(payload)
     )
     return code
+
+
+def _time(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("timestamp must be ISO-8601") from exc
+    if parsed.tzinfo is None:
+        raise argparse.ArgumentTypeError("timestamp must include a timezone")
+    return parsed
 
 
 __all__ = ("main", "render_summary", "run")

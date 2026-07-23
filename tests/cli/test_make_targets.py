@@ -21,7 +21,10 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     makefile = (root / "Makefile").read_text(encoding="utf-8")
     requirements = (root / "requirements.in").read_text(encoding="utf-8")
     assert "PYTHON ?= .venv/bin/python" in makefile
-    assert "PYTEST_PATHS ?= tests/event_alpha tests/rsi tests/cli tests/test_indicators.py" in makefile
+    assert (
+        "PYTEST_PATHS ?= tests/lean_radar tests/event_alpha tests/rsi tests/cli "
+        "tests/test_indicators.py"
+    ) in makefile
     assert "PYTEST_SAFE_ENV = PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in makefile
     assert "PYTEST_DURATIONS ?= 50" in makefile
     assert "PYTEST_WORKERS ?= auto" in makefile

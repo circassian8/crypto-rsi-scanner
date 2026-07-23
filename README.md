@@ -11,11 +11,13 @@ equal-priority dashboard and Telegram surfaces. Event Alpha remains available
 as optional Catalyst Context; Decision Radar and the Empirical Lab remain
 research infrastructure rather than the default operator gate.
 
-The first implemented slice imports a genuine locally supplied Bybit public
+The implemented foundation imports a genuine locally supplied Bybit public
 instrument catalog and intersects it with the top 200 CoinGecko assets ranked
 by 24-hour volume plus the manual watchlist. A watchlist entry that has no exact
-active Bybit USDT perpetual remains visibly blocked/unverified. These commands
-make no provider call or Telegram send:
+active Bybit USDT perpetual remains visibly blocked/unverified. The scan engine
+then builds explicitly labeled market features, chooses at most one setup per
+asset, applies the four operator scores, and atomically stores snapshots, ideas,
+and health. These setup commands make no provider call or Telegram send:
 
 ```sh
 make lean-radar-readiness PYTHON=.venv/bin/python
@@ -28,12 +30,20 @@ make lean-radar-universe \
   PYTHON=.venv/bin/python
 ```
 
+After the existing CoinGecko authorization is present, run one cadence-gated,
+no-send scan with `make lean-radar-scan PYTHON=.venv/bin/python`. It requests the
+CoinGecko market list in 24-hour-volume order. Direct percentage fields remain
+direct. Wilder RSI is visibly labeled as a calculation over untimestamped
+sparkline points, and the engine does not pretend array offsets are exact 4-hour
+bars. Without authorization, readiness and scan fail before the provider
+boundary.
+
 The import rejects checked-in fixture/test/mock/replay paths and never infers
 authorization. The runtime database is ignored from git and contains no order,
 position, portfolio, account, or paper-trading tables. See the
 [Lean Radar product contract](research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md).
 
-The scan, six-page dashboard, Telegram preview/readiness, calendar overlay, and
+The six-page dashboard, Telegram preview/readiness, calendar overlay, and
 outcome maturation are the next vertical slices. Until they land, the existing
 Decision Radar dashboard remains available as a research/compatibility surface.
 
