@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Ship the six-page Lean Radar dashboard · Codex
+**Why:** Lean Radar needed a coherent operator surface over its new SQLite
+runtime. The page also had to make fixture/import/live provenance impossible to
+confuse and keep scheduled calendar context visible on the primary Today view.
+**Changes:**
+- Added a bounded, schema-validating dashboard read model for the latest market
+  points, current/recent ideas, calendar, outcomes, persisted health, and idea
+  detail. Missing or malformed runtime state fails closed and a page load never
+  creates the database.
+- Added exactly six primary pages: Today, Ideas, Market, Calendar, Outcomes, and
+  System Health. Today groups urgent, watchlist, risk, and developing review
+  items and now surfaces scheduled risk in the next 24 hours without creating
+  direction. Ideas includes search/filter/sort plus detail views; Market has
+  bounded point-in-time rows and inline charts; the remaining pages preserve
+  calendar, outcome, and health distinctions.
+- Added a responsive, dependency-free interface with desktop navigation, a
+  mobile bottom bar, human route/type labels, score hierarchy, empty/error
+  states, and explicit Fixture data / Imported snapshot / Live no-send badges.
+  Fixture readiness can no longer visually imply a live provider state.
+- Added a concurrent loopback-only GET/HEAD WSGI server on port 8766 and
+  `lean-radar-dashboard` / `lean-radar-dashboard-smoke` targets. Browser requests
+  cannot write SQLite, inspect environment authorization, call a provider, send
+  Telegram, or run a new evaluation; unsafe methods return 405.
+- Updated the Lean product contract, working agreement, durable decision, and
+  roadmap. The legacy dashboard remains intact and Lean phone/public access is
+  intentionally outside this slice.
+**Verify:** All 54 Lean Radar tests pass with external pytest plugins disabled,
+including six-page rendering, filters/detail, near-term calendar visibility,
+provenance, bounded loading, corrupt/missing fail-closed behavior, loopback
+binding, and byte-identical SQLite state across GET/HEAD. The dashboard smoke
+renders all six pages from one disposable fixture database. Desktop and
+390-pixel mobile browser QA found no horizontal overflow, confirmed the fixed
+mobile navigation, and verified the scheduled-risk and fixture-provenance
+hierarchy. Python compileall, product-contract JSON parsing, diff checks, and
+architecture cleanliness also pass.
+**Notes/risks:** The server intentionally uses port 8766 while the legacy
+dashboard occupies 8765. Telegram is the next vertical slice. No provider call,
+send, trade, order, paper trade, normal RSI write, or `TRIGGERED_FADE` occurred.
+
 ## 2026-07-23 — Add point-in-time Lean outcomes and coherent system health · Codex
 **Why:** The operator needs to know whether a surfaced idea continued, reversed,
 or failed without hindsight-filled prices, and the future dashboard needs one

@@ -1496,10 +1496,24 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 789,
+  "class_count": 797,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
+    {
+      "accepted_exception": false,
+      "class_name": "LeanRadarDashboardApp",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 79,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard",
+      "owner_note": "",
+      "public": true,
+      "qualname": "LeanRadarDashboardApp",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard.py"
+    },
     {
       "accepted_exception": false,
       "class_name": "MarketSnapshot",
@@ -1599,7 +1613,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 7,
+  "classes_over_limit_count": 8,
   "exceptions": [
     {
       "module": "crypto_rsi_scanner.event_fade",
@@ -1607,9 +1621,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11452,
+  "function_count": 11523,
   "function_line_limit": 150,
-  "functions_over_150_lines": 38,
+  "functions_over_150_lines": 39,
   "functions_over_limit": [
     {
       "function_name": "_validate_closed_projection",
@@ -1900,6 +1914,14 @@
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py"
     },
     {
+      "function_name": "load_dashboard_state",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
+      "public": true,
+      "qualname": "load_dashboard_state",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_data.py"
+    },
+    {
       "function_name": "run_scan",
       "line_count": 246,
       "module": "crypto_rsi_scanner.lean_radar.scan",
@@ -1916,8 +1938,8 @@
       "source_path": "crypto_rsi_scanner/lean_radar/universe.py"
     }
   ],
-  "functions_over_limit_count": 38,
-  "generated_at": "2026-07-23T03:19:04.901164+00:00",
+  "functions_over_limit_count": 39,
+  "generated_at": "2026-07-23T03:46:11.432238+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3548,8 +3570,22 @@
     "new_multi_public_class_module": "fails architecture gates unless registered as a model bundle",
     "public_class_over_75_lines": "advisory measurement only"
   },
-  "production_classes_over_limit": 7,
+  "production_classes_over_limit": 8,
   "production_classes_over_limit_rows": [
+    {
+      "accepted_exception": false,
+      "class_name": "LeanRadarDashboardApp",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 79,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard",
+      "owner_note": "",
+      "public": true,
+      "qualname": "LeanRadarDashboardApp",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard.py"
+    },
     {
       "accepted_exception": false,
       "class_name": "MarketSnapshot",
@@ -3649,7 +3685,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 38,
+  "production_functions_over_limit": 39,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -3940,6 +3976,14 @@
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py"
     },
     {
+      "function_name": "load_dashboard_state",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
+      "public": true,
+      "qualname": "load_dashboard_state",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_data.py"
+    },
+    {
       "function_name": "run_scan",
       "line_count": 246,
       "module": "crypto_rsi_scanner.lean_radar.scan",
@@ -4078,7 +4122,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 530,
+  "public_class_count": 532,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -4311,6 +4355,8 @@
     "crypto_rsi_scanner.event_providers.tokenomist": 1,
     "crypto_rsi_scanner.lean_radar.bybit_universe": 1,
     "crypto_rsi_scanner.lean_radar.config": 1,
+    "crypto_rsi_scanner.lean_radar.dashboard": 1,
+    "crypto_rsi_scanner.lean_radar.dashboard_render": 1,
     "crypto_rsi_scanner.lean_radar.models": 8,
     "crypto_rsi_scanner.lean_radar.store": 1,
     "crypto_rsi_scanner.lean_radar.universe": 1,
@@ -4340,6 +4386,20 @@
   },
   "public_classes_not_in_own_module": 0,
   "remaining_class_ownership_debt": [
+    {
+      "accepted_exception": false,
+      "class_name": "LeanRadarDashboardApp",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 79,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard",
+      "owner_note": "",
+      "public": true,
+      "qualname": "LeanRadarDashboardApp",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard.py"
+    },
     {
       "accepted_exception": false,
       "class_name": "MarketSnapshot",
@@ -4397,7 +4457,7 @@
       "source_path": "crypto_rsi_scanner/lean_radar/store.py"
     }
   ],
-  "remaining_class_ownership_debt_count": 4,
+  "remaining_class_ownership_debt_count": 5,
   "research_only": true,
   "row_type": "architecture_class_ownership_report",
   "schema_version": "architecture_class_ownership_report_v1",
@@ -4472,7 +4532,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 38,
+      "functions_over_150_lines": 39,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -4795,7 +4855,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 38,
+    "functions_over_150_lines": 39,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,

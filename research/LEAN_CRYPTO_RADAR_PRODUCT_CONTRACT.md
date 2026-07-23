@@ -1,8 +1,8 @@
 # Lean Crypto Radar V1 Product Contract
 
 Status: active product rebuild. The universe/store, market-scan, context-only
-calendar, automatic outcomes, and bounded system-health slices are implemented;
-the dashboard and Telegram preview remain in progress.
+calendar, automatic outcomes, bounded system health, and six-page read-only
+dashboard are implemented; Telegram preview remains in progress.
 
 ## Product
 
@@ -115,6 +115,28 @@ outcomes, no-send state, Telegram mode, bounded errors, and the next safe
 command. The command makes no provider call and no send. A missing runtime
 database produces setup guidance without creating one.
 
+## Implemented dashboard contract
+
+The Lean dashboard is a read-only view over the one SQLite runtime. It has
+exactly six primary pages: Today, Ideas, Market, Calendar, Outcomes, and System
+Health. Today leads with current attention, scan truth, and scheduled risk in
+the next 24 hours. Ideas supports bounded search, route/type/horizon filters,
+score sorting, and one detail page that keeps price/activity, technical,
+calendar, catalyst, and outcome context visibly separate. Market renders the
+latest point per venue-confirmed asset, Calendar labels every event as
+context-only, Outcomes distinguishes pending, matured, and unresolved evidence,
+and System Health separates current authorization from historical provider
+results.
+
+Every page shows whether its current scan came from a live no-send request, a
+genuine imported snapshot, or fixture data. A fixture can support offline smoke
+and visual review but can never masquerade as live state. Browser GET/HEAD
+requests neither inspect environment authorization nor write SQLite, call a
+provider, send Telegram, or run analysis. Invalid or absent runtime state fails
+closed with one safe local health command. The server is concurrent and
+loopback-only on `127.0.0.1:8766` during coexistence with the legacy dashboard;
+phone/public access is not enabled by this slice.
+
 ## Hard gates and soft limitations
 
 Hard gates are unresolved identity, no confirmed Bybit USDT perpetual, stale or
@@ -163,6 +185,7 @@ make lean-radar-scan PYTHON=.venv/bin/python
 make lean-radar-calendar-readiness PYTHON=.venv/bin/python
 make lean-radar-outcomes PYTHON=.venv/bin/python
 make lean-radar-health PYTHON=.venv/bin/python
+make lean-radar-dashboard PYTHON=.venv/bin/python
 ```
 
 The live scan command respects the already-present CoinGecko authorization and
@@ -184,7 +207,9 @@ make lean-radar-scan \
 
 Readiness is observational and makes no provider call or database write.
 Outcome maturation and health refresh are local SQLite updates that make no
-provider call, send, or model-policy change. The
+provider call, send, or model-policy change. The dashboard is a read-only
+loopback view; `make lean-radar-dashboard-smoke` renders all six primary pages
+against one disposable fixture database without touching operator state. The
 catalog import and genuine market-snapshot import reject checked-in fixture,
 test, mock, or replay paths. Until the remaining vertical slices land, the
 legacy Decision Radar commands remain available for research operations.

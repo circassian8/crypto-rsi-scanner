@@ -2,20 +2,20 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-23T03:19:04.901164+00:00`
-- public_class_count: `530`
-- classes_over_limit_count: `7`
-- functions_over_limit_count: `38`
-- production_classes_over_limit: `7`
-- production_functions_over_limit: `38`
+- generated_at: `2026-07-23T03:46:11.432238+00:00`
+- public_class_count: `532`
+- classes_over_limit_count: `8`
+- functions_over_limit_count: `39`
+- production_classes_over_limit: `8`
+- production_functions_over_limit: `39`
 - accepted_class_exceptions_count: `3`
-- remaining_class_ownership_debt_count: `4`
+- remaining_class_ownership_debt_count: `5`
 - v3_gate_status: `pass`
 - v3_auto_accept_ready: `True`
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `38`
+- functions_over_150_lines: `39`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `85`
@@ -48,7 +48,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 12 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 38 | advisory |
+| `functions_over_150_lines` | 39 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -307,6 +307,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | module | class | lines | public | accepted | exception |
 |---|---|---:|---:|---:|---|
+| `crypto_rsi_scanner.lean_radar.dashboard` | `LeanRadarDashboardApp` | 79 | true | false |  |
 | `crypto_rsi_scanner.lean_radar.models` | `MarketSnapshot` | 78 | true | false |  |
 | `crypto_rsi_scanner.lean_radar.models` | `LeanIdea` | 104 | true | false |  |
 | `crypto_rsi_scanner.lean_radar.models` | `LeanOutcome` | 123 | true | false |  |
@@ -355,5 +356,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_hypothesis_latest_score_components` | 153 | false |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 160 | false |
 | `crypto_rsi_scanner.lean_radar.cli` | `run` | 192 | true |
+| `crypto_rsi_scanner.lean_radar.dashboard_data` | `load_dashboard_state` | 151 | true |
 | `crypto_rsi_scanner.lean_radar.scan` | `run_scan` | 246 | true |
 | `crypto_rsi_scanner.lean_radar.universe` | `build_universe` | 181 | true |

@@ -167,7 +167,7 @@ require a known catalyst to surface a liquid, timely market-led review item.
 - Dashboard and Telegram are equal-priority operator surfaces. Telegram remains
   no-send by default and any send keeps the existing explicit guards.
 - The only main scores are actionability, confidence, risk, and urgency; they
-  are not win probabilities. There are at most ten idea types and six primary
+  are not win probabilities. There are at most nine idea types and six primary
   dashboard pages.
 - Unknown catalyst is a soft confidence/risk limitation, not a universal gate.
   Event Alpha is optional Catalyst Context beside the lean path.
@@ -206,6 +206,14 @@ require a known catalyst to surface a liquid, timely market-led review item.
   `make lean-radar-health` persists bounded local operator truth without a
   provider call or send and keeps current authorization/call eligibility
   separate from the latest historical provider attempt/result.
+- `make lean-radar-dashboard` serves the one SQLite runtime read-only on
+  `127.0.0.1:8766` with exactly Today, Ideas, Market, Calendar, Outcomes, and
+  System Health as primary pages. Every page labels live no-send, genuine
+  imported, or fixture provenance. GET/HEAD must not write, inspect environment
+  authorization, call providers, send, or evaluate new ideas. Missing or
+  invalid runtime state fails closed. The dashboard remains loopback-only and
+  does not inherit legacy publication/pointer authority or phone-access state.
+  `make lean-radar-dashboard-smoke` uses only a disposable fixture database.
 
 The durable product contract is
 `research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md` / `.json`. During the rebuild,

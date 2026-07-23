@@ -6,7 +6,7 @@
   "implementation_state": {
     "bybit_universe_and_store_foundation": "implemented",
     "scan_and_idea_detection": "implemented",
-    "dashboard": "pending",
+    "dashboard": "implemented",
     "telegram_preview": "pending",
     "calendar": "implemented",
     "outcomes": "implemented",
@@ -123,6 +123,32 @@
     "dashboard_priority": "primary_equal",
     "telegram_priority": "primary_equal",
     "dashboard_page_limit": 6,
+    "dashboard_pages": [
+      "today",
+      "ideas",
+      "market",
+      "calendar",
+      "outcomes",
+      "system_health"
+    ],
+    "dashboard_runtime": {
+      "source": "single_sqlite_runtime",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "browser_writes": false,
+      "browser_environment_authorization_inspection": false,
+      "provider_calls": false,
+      "telegram_sends": false,
+      "default_host": "127.0.0.1",
+      "default_port": 8766,
+      "provenance_badges": [
+        "live_no_send",
+        "imported_snapshot",
+        "fixture"
+      ]
+    },
     "telegram_default": "no_send"
   },
   "idea_types": [

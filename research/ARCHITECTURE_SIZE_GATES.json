@@ -1746,6 +1746,20 @@
   "classes_over_limit": [
     {
       "accepted_exception": false,
+      "class_name": "LeanRadarDashboardApp",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 79,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard",
+      "owner_note": "",
+      "public": true,
+      "qualname": "LeanRadarDashboardApp",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard.py"
+    },
+    {
+      "accepted_exception": false,
       "class_name": "MarketSnapshot",
       "exception_category": "",
       "exception_reason": null,
@@ -1843,7 +1857,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 7,
+  "classes_over_limit_count": 8,
   "enforcement_status": "quantitative_limits_advisory_only",
   "existing_violation_count": 3,
   "existing_violations": [
@@ -1899,7 +1913,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1210,
+  "file_count": 1215,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -2321,6 +2335,14 @@
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py"
     },
     {
+      "function_name": "load_dashboard_state",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
+      "public": true,
+      "qualname": "load_dashboard_state",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_data.py"
+    },
+    {
       "function_name": "run_scan",
       "line_count": 246,
       "module": "crypto_rsi_scanner.lean_radar.scan",
@@ -2337,9 +2359,9 @@
       "source_path": "crypto_rsi_scanner/lean_radar/universe.py"
     }
   ],
-  "functions_over_limit_count": 38,
+  "functions_over_limit_count": 39,
   "gate_status": "pass",
-  "generated_at": "2026-07-23T03:19:01.252933+00:00",
+  "generated_at": "2026-07-23T03:46:07.480507+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -4448,8 +4470,8 @@
   ],
   "new_blocking_violation_count": 0,
   "new_blocking_violations": [],
-  "new_measurement_count": 63,
-  "new_violation_count": 63,
+  "new_measurement_count": 65,
+  "new_violation_count": 65,
   "new_violations": [
     {
       "category": "file_over_1500_lines",
@@ -4639,6 +4661,23 @@
       "severity": "advisory",
       "source_kind": "test",
       "violation_id": "file:tests/event_alpha/test_market_surfaces.py"
+    },
+    {
+      "accepted_exception": false,
+      "category": "class_over_75_lines",
+      "class_name": "LeanRadarDashboardApp",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 79,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard",
+      "owner_note": "",
+      "public": true,
+      "qualname": "LeanRadarDashboardApp",
+      "revisit_condition": "",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard.py",
+      "violation_id": "class:crypto_rsi_scanner/lean_radar/dashboard.py:LeanRadarDashboardApp"
     },
     {
       "accepted_exception": false,
@@ -5106,6 +5145,17 @@
     },
     {
       "category": "function_over_150_lines",
+      "function_name": "load_dashboard_state",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
+      "public": true,
+      "qualname": "load_dashboard_state",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_data.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/dashboard_data.py:load_dashboard_state"
+    },
+    {
+      "category": "function_over_150_lines",
       "function_name": "run_scan",
       "line_count": 246,
       "module": "crypto_rsi_scanner.lean_radar.scan",
@@ -5140,8 +5190,22 @@
     "quantitative_line_counts": "advisory inventory only; never a development or release blocker",
     "test_file_size_debt": "advisory inventory only"
   },
-  "production_classes_over_limit": 7,
+  "production_classes_over_limit": 8,
   "production_classes_over_limit_rows": [
+    {
+      "accepted_exception": false,
+      "class_name": "LeanRadarDashboardApp",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 79,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard",
+      "owner_note": "",
+      "public": true,
+      "qualname": "LeanRadarDashboardApp",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard.py"
+    },
     {
       "accepted_exception": false,
       "class_name": "MarketSnapshot",
@@ -5517,7 +5581,7 @@
   "production_files_over_1500_lines": 12,
   "production_files_over_2000_lines": 5,
   "production_files_over_3000_lines": 1,
-  "production_functions_over_limit": 38,
+  "production_functions_over_limit": 39,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -5808,6 +5872,14 @@
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py"
     },
     {
+      "function_name": "load_dashboard_state",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
+      "public": true,
+      "qualname": "load_dashboard_state",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_data.py"
+    },
+    {
       "function_name": "run_scan",
       "line_count": 246,
       "module": "crypto_rsi_scanner.lean_radar.scan",
@@ -5950,6 +6022,20 @@
   "remaining_class_ownership_debt": [
     {
       "accepted_exception": false,
+      "class_name": "LeanRadarDashboardApp",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 79,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard",
+      "owner_note": "",
+      "public": true,
+      "qualname": "LeanRadarDashboardApp",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard.py"
+    },
+    {
+      "accepted_exception": false,
       "class_name": "MarketSnapshot",
       "exception_category": "",
       "exception_reason": null,
@@ -6005,7 +6091,7 @@
       "source_path": "crypto_rsi_scanner/lean_radar/store.py"
     }
   ],
-  "remaining_class_ownership_debt_count": 4,
+  "remaining_class_ownership_debt_count": 5,
   "research_only": true,
   "resolved_violation_count": 8,
   "resolved_violation_ids": [
@@ -6214,7 +6300,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 38,
+      "functions_over_150_lines": 39,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -6531,7 +6617,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 38,
+    "functions_over_150_lines": 39,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,
@@ -6545,6 +6631,7 @@
   },
   "v3_pending_exceptions": [],
   "violation_ids": [
+    "class:crypto_rsi_scanner/lean_radar/dashboard.py:LeanRadarDashboardApp",
     "class:crypto_rsi_scanner/lean_radar/models.py:LeanIdea",
     "class:crypto_rsi_scanner/lean_radar/models.py:LeanOutcome",
     "class:crypto_rsi_scanner/lean_radar/models.py:MarketSnapshot",
@@ -6609,6 +6696,7 @@
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_hypothesis_latest_score_components",
     "function:crypto_rsi_scanner/lean_radar/cli.py:run",
+    "function:crypto_rsi_scanner/lean_radar/dashboard_data.py:load_dashboard_state",
     "function:crypto_rsi_scanner/lean_radar/scan.py:run_scan",
     "function:crypto_rsi_scanner/lean_radar/universe.py:build_universe"
   ],
@@ -6801,6 +6889,23 @@
       "severity": "advisory",
       "source_kind": "test",
       "violation_id": "file:tests/event_alpha/test_market_surfaces.py"
+    },
+    {
+      "accepted_exception": false,
+      "category": "class_over_75_lines",
+      "class_name": "LeanRadarDashboardApp",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 79,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard",
+      "owner_note": "",
+      "public": true,
+      "qualname": "LeanRadarDashboardApp",
+      "revisit_condition": "",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard.py",
+      "violation_id": "class:crypto_rsi_scanner/lean_radar/dashboard.py:LeanRadarDashboardApp"
     },
     {
       "accepted_exception": false,
@@ -7316,6 +7421,17 @@
       "severity": "advisory",
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py",
       "violation_id": "function:crypto_rsi_scanner/lean_radar/cli.py:run"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "load_dashboard_state",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
+      "public": true,
+      "qualname": "load_dashboard_state",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_data.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/dashboard_data.py:load_dashboard_state"
     },
     {
       "category": "function_over_150_lines",

@@ -16,6 +16,31 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Keep the Lean dashboard closed over runtime truth
+**Status:** accepted
+**Decision:** Serve Lean Radar from the single SQLite runtime through exactly
+six primary pages: Today, Ideas, Market, Calendar, Outcomes, and System Health.
+Use only bounded read transactions, expose no mutation endpoint, and permit
+only GET/HEAD. Browser reads must not inspect environment authorization,
+call providers, send Telegram, or recalculate ideas. Every page must label the
+current scan as live no-send, genuine imported, or fixture data; fixture state
+may support smoke and visual QA but cannot look live. Today owns near-term
+attention and scheduled-risk context, while detailed market, calendar, outcome,
+and health evidence remains one click away. Invalid or absent runtime state
+fails closed with the exact safe health command.
+
+Keep the first server loopback-only on `127.0.0.1:8766` while the legacy
+dashboard continues to use 8765. Do not silently inherit its artifact pointer,
+publication receipts, or phone-access state. Public/private access requires a
+separately reviewed Lean boundary.
+**Why:** The operator needs one professional, coherent surface, but rendering
+must remain a pure view of persisted truth. Explicit provenance prevents an
+attractive fixture or old provider success from being mistaken for current
+live evidence.
+**Revisit when:** The Lean path becomes the only dashboard or a separately
+guarded phone-access workflow is implemented and verified without widening the
+runtime's provider or write boundary.
+
 ## 2026-07-23 - Keep Lean outcomes point-in-time and policy-ineligible
 **Status:** accepted
 **Decision:** Create `1h`, `4h`, `24h`, and `3d` pending outcomes atomically

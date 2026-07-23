@@ -117,6 +117,8 @@ LEAN_RADAR_MARKET_MODE ?= live_no_send
 LEAN_RADAR_MARKET_OBSERVED_AT ?=
 LEAN_RADAR_OUTCOMES_EVALUATED_AT ?=
 LEAN_RADAR_HEALTH_EVALUATED_AT ?=
+LEAN_RADAR_DASHBOARD_HOST ?= 127.0.0.1
+LEAN_RADAR_DASHBOARD_PORT ?= 8766
 LEAN_RADAR_WATCHLIST_ASSET_ID ?=
 LEAN_RADAR_WATCHLIST_SYMBOL ?=
 LEAN_RADAR_WATCHLIST_NOTE ?=
@@ -273,7 +275,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
 .PHONY: radar-unlock-tokenomist-v5-smoke radar-unlock-tokenomist-v5-capture-smoke radar-unlock-tokenomist-v5-readiness
-.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health
+.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health lean-radar-dashboard lean-radar-dashboard-smoke
 
 help:
 	@echo "Targets:"
@@ -309,6 +311,8 @@ help:
 	@echo "  CONFIRM=1 make lean-radar-calendar-import LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/calendar.json  Import a genuine local calendar snapshot"
 	@echo "  make lean-radar-outcomes  Mature due horizons from retained point-in-time snapshots; no provider call"
 	@echo "  make lean-radar-health  Refresh bounded operator health; no provider call or send"
+	@echo "  make lean-radar-dashboard  Serve the six-page read-only Lean dashboard on loopback"
+	@echo "  make lean-radar-dashboard-smoke  Render every Lean dashboard page offline"
 	@echo "  CONFIRM=1 make lean-radar-watchlist-add LEAN_RADAR_WATCHLIST_ASSET_ID=... LEAN_RADAR_WATCHLIST_SYMBOL=...  Add one blocked-until-verified watchlist asset"
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
@@ -1437,6 +1441,16 @@ lean-radar-health:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
 		--db $(LEAN_RADAR_DB_PATH) health $(LEAN_RADAR_HEALTH_EVALUATED_AT_ARG)
+
+lean-radar-dashboard:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar.dashboard \
+		--db $(LEAN_RADAR_DB_PATH) \
+		--host $(LEAN_RADAR_DASHBOARD_HOST) --port $(LEAN_RADAR_DASHBOARD_PORT)
+
+lean-radar-dashboard-smoke:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar.dashboard --smoke
 
 radar-dashboard:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \
