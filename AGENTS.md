@@ -190,6 +190,12 @@ require a known catalyst to surface a liquid, timely market-led review item.
   4h return from sparkline array position. The first eight observations are
   baseline warm-up, not fabricated history. Missing spread caps confidence and
   urgency rather than becoming an estimate.
+- Lean calendar readiness is read-only. Genuine local import is `CONFIRM=1`,
+  rejects fixture/test/mock/replay paths, fingerprints the exact source bytes,
+  and stores only validated events in the same SQLite database. Macro events are
+  global context; crypto events require an exact affected symbol. They may raise
+  risk/urgency or shorten an existing idea's expiry, but must remain
+  `context_only=true`, create no direction, and never manufacture an idea.
 
 The durable product contract is
 `research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md` / `.json`. During the rebuild,

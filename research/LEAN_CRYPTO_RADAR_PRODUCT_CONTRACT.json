@@ -8,7 +8,8 @@
     "scan_and_idea_detection": "implemented",
     "dashboard": "pending",
     "telegram_preview": "pending",
-    "calendar_and_outcomes": "pending"
+    "calendar": "implemented",
+    "outcomes": "pending"
   },
   "venue": "bybit",
   "instrument_type": "usdt_perpetual",
@@ -44,6 +45,30 @@
     "one_setup_per_asset": true,
     "atomic_snapshot_idea_health_write": true,
     "provisional_rules_are_win_probabilities": false
+  },
+  "calendar": {
+    "runtime_store": "sqlite_calendar_events",
+    "live_provider_call": false,
+    "genuine_local_import_confirmation_required": true,
+    "exact_source_bytes_sha256": true,
+    "supported_categories": [
+      "fomc",
+      "cpi",
+      "ppi",
+      "pce",
+      "employment_report",
+      "gdp",
+      "crypto_unlock",
+      "exchange_listing",
+      "exchange_delisting",
+      "protocol_event"
+    ],
+    "macro_scope": "global_context",
+    "crypto_scope": "exact_affected_symbol_only",
+    "may_raise_risk_or_urgency": true,
+    "may_shorten_existing_idea_expiry": true,
+    "may_create_directional_bias": false,
+    "may_create_idea_without_market_setup": false
   },
   "surfaces": {
     "dashboard_priority": "primary_equal",

@@ -1,0 +1,18 @@
+{
+  "schema_version": "lean_calendar_import_v1",
+  "source_observed_at": "2026-07-23T11:30:00Z",
+  "source_name": "Lean Radar offline calendar fixture",
+  "source_url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+  "events": [
+    {
+      "event_id": "fixture-fomc-2026-07-23",
+      "title": "Federal Reserve decision",
+      "category": "fomc",
+      "starts_at": "2026-07-23T18:00:00Z",
+      "ends_at": "2026-07-23T18:30:00Z",
+      "time_certainty": "window",
+      "importance": "high",
+      "affected_symbols": []
+    }
+  ]
+}

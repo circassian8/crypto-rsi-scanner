@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-23T02:35:43.259921+00:00`
+- generated_at: `2026-07-23T02:59:33.608883+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -19,11 +19,11 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `5`
 - production_files_over_3000_lines: `1`
 - production_classes_over_limit: `6`
-- production_functions_over_limit: `37`
+- production_functions_over_limit: `38`
 - test_size_gate_status: `advisory`
 - test_files_over_1500_lines: `9`
 - classes_over_limit_count: `6`
-- functions_over_limit_count: `37`
+- functions_over_limit_count: `38`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `3`
 - modules_with_multiple_public_classes_count: `0`
@@ -31,7 +31,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - multi_public_class_modules_count: `85`
 - accepted_model_bundles_count: `84`
 - unresolved_multi_class_modules_count: `0`
-- new_violation_count: `61`
+- new_violation_count: `62`
 - moved_existing_violation_count: `0`
 - api_decomposition_gate_status: `advisory`
 - api_files_over_1500_lines: `0`
@@ -66,7 +66,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1720 |
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/radar/market_history.py` | 2234 |
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py` | 2369 |
-| `file_over_1500_lines` | `file:tests/cli/test_make_targets.py` | 1573 |
+| `file_over_1500_lines` | `file:tests/cli/test_make_targets.py` | 1576 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_burn_in_operations.py` | 1549 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_decision_model_v2.py` | 3021 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_impact_hypotheses.py` | 1588 |
@@ -77,7 +77,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_surfaces.py` | 1984 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:MarketSnapshot` | 78 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:LeanIdea` | 102 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/store.py:LeanRadarStore` | 441 |
+| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/store.py:LeanRadarStore` | 586 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/artifacts/schema/decision_model.py:_validate_closed_projection` | 194 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py:_validate_return_interval_overlap` | 163 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py:_validate_return_feature_consistency` | 183 |
@@ -113,7 +113,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/market_state.py:snapshot_from_market_row` | 175 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_hypothesis_latest_score_components` | 153 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row` | 160 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/scan.py:run_scan` | 196 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/cli.py:run` | 178 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/scan.py:run_scan` | 227 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/universe.py:build_universe` | 181 |
 
 ## Architecture Gates
@@ -130,7 +131,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 12 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 37 | advisory |
+| `functions_over_150_lines` | 38 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -254,13 +255,13 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_market_shadow_surprise.py` | 1980 |
 | `tests/event_alpha/test_market_history.py` | 1660 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 1588 |
-| `tests/cli/test_make_targets.py` | 1573 |
+| `tests/cli/test_make_targets.py` | 1576 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1549 |
 | `tests/event_alpha/test_market_no_send.py` | 1504 |
 | `tests/event_alpha/test_operator_state.py` | 1499 |
 | `tests/event_alpha/test_radar_dashboard.py` | 1485 |
+| `tests/event_alpha/test_artifact_schema.py` | 1482 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1480 |
-| `tests/event_alpha/test_artifact_schema.py` | 1479 |
 | `tests/event_alpha/test_operator_workflows.py` | 1464 |
 | `tests/event_alpha/test_provider_activation.py` | 1452 |
 | `tests/event_alpha/test_core_opportunities.py` | 1431 |
@@ -305,7 +306,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1720 |
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 2234 |
 | `crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py` | 2369 |
-| `tests/cli/test_make_targets.py` | 1573 |
+| `tests/cli/test_make_targets.py` | 1576 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1549 |
 | `tests/event_alpha/test_decision_model_v2.py` | 3021 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 1588 |

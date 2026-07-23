@@ -10,6 +10,7 @@ import re
 from typing import Mapping, Sequence
 
 from .bybit_universe import BybitUniverseError, load_catalog
+from .calendar import LeanCalendarError, load_calendar_snapshot
 from .config import LeanRadarConfigError, load_settings
 from .market_data import MarketDataError, live_provider_authorized
 from .scan import run_scan, scan_readiness
@@ -29,10 +30,15 @@ def _parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("readiness")
     subparsers.add_parser("bybit-readiness")
+    subparsers.add_parser("calendar-readiness")
 
     importer = subparsers.add_parser("bybit-import")
     importer.add_argument("--catalog", type=Path, required=True)
     importer.add_argument("--confirm", action="store_true")
+
+    calendar_importer = subparsers.add_parser("calendar-import")
+    calendar_importer.add_argument("--calendar", type=Path, required=True)
+    calendar_importer.add_argument("--confirm", action="store_true")
 
     universe = subparsers.add_parser("universe")
     universe.add_argument("--markets", type=Path)
@@ -58,6 +64,45 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
     args = _parser().parse_args(argv)
     settings = load_settings()
     store = LeanRadarStore(args.db or settings.db_path)
+    if args.command == "calendar-readiness":
+        calendar = store.calendar_status()
+        return 0, {
+            "status": "ready" if calendar["status"] == "ready" else "setup_required",
+            "calendar": calendar,
+            "provider_call_attempted": False,
+            "telegram_send_attempted": False,
+            "research_only": True,
+            "next_safe_command": (
+                "make lean-radar-scan"
+                if calendar["status"] == "ready"
+                else "CONFIRM=1 make lean-radar-calendar-import "
+                "LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/to/calendar.json"
+            ),
+        }
+    if args.command == "calendar-import":
+        if not args.confirm:
+            return 2, {
+                "status": "confirmation_required",
+                "provider_call_attempted": False,
+                "research_only": True,
+            }
+        events = load_calendar_snapshot(
+            args.calendar,
+            source_mode="imported_snapshot",
+        )
+        store.upsert_calendar_events(events)
+        return 0, {
+            "status": "imported",
+            "calendar_event_count": len(events),
+            "source_name": events[0].source_name,
+            "source_observed_at": events[0].source_observed_at,
+            "source_sha256": events[0].source_sha256,
+            "context_only": True,
+            "provider_call_attempted": False,
+            "telegram_send_attempted": False,
+            "research_only": True,
+            "next_safe_command": "make lean-radar-scan",
+        }
     if args.command in {"readiness", "bybit-readiness"}:
         catalog = store.catalog_status()
         if args.command == "readiness":
@@ -216,6 +261,15 @@ def render_summary(payload: Mapping[str, object]) -> str:
             f"Snapshots: {payload.get('snapshot_count', 0)} · "
             f"ideas: {payload.get('idea_count', 0)}"
         )
+    if "calendar_event_count" in payload:
+        lines.append(f"Calendar events: {payload['calendar_event_count']}")
+    calendar = payload.get("calendar")
+    if isinstance(calendar, Mapping):
+        lines.append(
+            f"Calendar: {calendar.get('status', 'unknown')} · "
+            f"events: {calendar.get('event_count', 0)} · "
+            f"upcoming: {calendar.get('upcoming_event_count', 0)}"
+        )
     if payload.get("next_safe_command"):
         lines.append(f"Next: {payload['next_safe_command']}")
     lines.append("Research only · no send · no trading")
@@ -233,6 +287,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     forwarded.append(args.command)
     if args.command == "bybit-import":
         forwarded.extend(("--catalog", str(args.catalog)))
+        if args.confirm:
+            forwarded.append("--confirm")
+    elif args.command == "calendar-import":
+        forwarded.extend(("--calendar", str(args.calendar)))
         if args.confirm:
             forwarded.append("--confirm")
     elif args.command == "universe" and args.markets:
@@ -253,6 +311,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         code, payload = run(forwarded)
     except (
         BybitUniverseError,
+        LeanCalendarError,
         LeanRadarConfigError,
         LeanRadarStoreError,
         LeanUniverseError,

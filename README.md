@@ -38,13 +38,25 @@ sparkline points, and the engine does not pretend array offsets are exact 4-hour
 bars. Without authorization, readiness and scan fail before the provider
 boundary.
 
+Calendar context is also available without a live call. Check it with
+`make lean-radar-calendar-readiness`; import a genuine operator-downloaded
+snapshot with:
+
+```sh
+CONFIRM=1 make lean-radar-calendar-import \
+  LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/to/calendar.json
+```
+
+Scheduled events can raise risk/urgency and shorten an existing idea, but never
+create a long or short idea by themselves.
+
 The import rejects checked-in fixture/test/mock/replay paths and never infers
 authorization. The runtime database is ignored from git and contains no order,
 position, portfolio, account, or paper-trading tables. See the
 [Lean Radar product contract](research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md).
 
-The six-page dashboard, Telegram preview/readiness, calendar overlay, and
-outcome maturation are the next vertical slices. Until they land, the existing
+The six-page dashboard, Telegram preview/readiness, and outcome maturation are
+the next vertical slices. Until they land, the existing
 Decision Radar dashboard remains available as a research/compatibility surface.
 
 ## Existing Decision Radar dashboard (research/compatibility)

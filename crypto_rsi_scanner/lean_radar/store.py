@@ -12,7 +12,7 @@ import stat
 from typing import Iterator, Mapping, Sequence
 from urllib.parse import quote
 
-from .models import BybitInstrument, LeanIdea, MarketSnapshot
+from .models import BybitInstrument, CalendarEvent, LeanIdea, MarketSnapshot
 
 
 SCHEMA_VERSION = 1
@@ -216,6 +216,151 @@ class LeanRadarStore:
                 """
             ).fetchall()
         return tuple(dict(row) for row in rows)
+
+    def upsert_calendar_events(
+        self,
+        events: Sequence[CalendarEvent],
+        *,
+        imported_at: datetime | None = None,
+    ) -> None:
+        if not events:
+            raise LeanRadarStoreError("refusing to import an empty calendar snapshot")
+        source_names = {row.source_name for row in events}
+        source_times = {row.source_observed_at for row in events}
+        source_modes = {row.source_mode for row in events}
+        source_hashes = {row.source_sha256 for row in events}
+        if any(
+            len(values) != 1
+            for values in (source_names, source_times, source_modes, source_hashes)
+        ):
+            raise LeanRadarStoreError("calendar source identity is inconsistent")
+        imported = (imported_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        payloads = [
+            json.dumps(
+                row.to_dict(),
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+            for row in events
+        ]
+        metadata = {
+            "calendar_last_imported_at": imported.isoformat(),
+            "calendar_source_name": next(iter(source_names)),
+            "calendar_source_observed_at": next(iter(source_times)),
+            "calendar_source_mode": next(iter(source_modes)),
+            "calendar_source_sha256": next(iter(source_hashes)),
+            "calendar_last_import_event_count": str(len(events)),
+        }
+        with self.connect(write=True) as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                connection.executemany(
+                    """
+                    INSERT INTO calendar_events (event_id, event_time, payload_json)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(event_id) DO UPDATE SET
+                        event_time = excluded.event_time,
+                        payload_json = excluded.payload_json
+                    """,
+                    [
+                        (row.event_id, row.starts_at, payload)
+                        for row, payload in zip(events, payloads)
+                    ],
+                )
+                connection.executemany(
+                    "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                    sorted(metadata.items()),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+
+    def calendar_status(
+        self,
+        *,
+        evaluated_at: datetime | None = None,
+    ) -> dict[str, object]:
+        now = (evaluated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        if not self.path.exists():
+            return {
+                "status": "missing",
+                "event_count": 0,
+                "upcoming_event_count": 0,
+                "next_event_at": None,
+                "source_mode": "unavailable",
+                "source_observed_at": None,
+            }
+        with self.connect() as connection:
+            count = int(
+                connection.execute("SELECT COUNT(*) FROM calendar_events").fetchone()[0]
+            )
+            upcoming_count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM calendar_events WHERE event_time >= ?",
+                    (now.isoformat(),),
+                ).fetchone()[0]
+            )
+            next_row = connection.execute(
+                """
+                SELECT event_time FROM calendar_events
+                WHERE event_time >= ? ORDER BY event_time, event_id LIMIT 1
+                """,
+                (now.isoformat(),),
+            ).fetchone()
+            metadata = dict(
+                connection.execute(
+                    "SELECT key, value FROM meta WHERE key LIKE 'calendar_%'"
+                ).fetchall()
+            )
+        return {
+            "status": "ready" if upcoming_count else "no_upcoming" if count else "empty",
+            "event_count": count,
+            "upcoming_event_count": upcoming_count,
+            "next_event_at": next_row["event_time"] if next_row else None,
+            "source_name": metadata.get("calendar_source_name"),
+            "source_mode": metadata.get("calendar_source_mode", "unavailable"),
+            "source_observed_at": metadata.get("calendar_source_observed_at"),
+            "source_sha256": metadata.get("calendar_source_sha256"),
+            "last_imported_at": metadata.get("calendar_last_imported_at"),
+            "last_import_event_count": int(
+                metadata.get("calendar_last_import_event_count", "0")
+            ),
+        }
+
+    def list_calendar_events(
+        self,
+        *,
+        start: datetime,
+        end: datetime,
+        limit: int = 500,
+    ) -> tuple[CalendarEvent, ...]:
+        if start.tzinfo is None or end.tzinfo is None or end < start:
+            raise LeanRadarStoreError("calendar query window is invalid")
+        if not self.path.exists():
+            return ()
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT payload_json FROM calendar_events
+                WHERE event_time >= ? AND event_time <= ?
+                ORDER BY event_time, event_id LIMIT ?
+                """,
+                (
+                    start.astimezone(timezone.utc).isoformat(),
+                    end.astimezone(timezone.utc).isoformat(),
+                    max(1, min(limit, 1_000)),
+                ),
+            ).fetchall()
+        events: list[CalendarEvent] = []
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            if not isinstance(payload, dict):
+                raise LeanRadarStoreError("stored calendar event is invalid")
+            payload["affected_symbols"] = tuple(payload.get("affected_symbols", ()))
+            events.append(CalendarEvent(**payload))
+        return tuple(events)
 
     def snapshot_history(
         self,

@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Add a context-only Lean calendar overlay · Codex
+**Why:** Scheduled macro and crypto events change timing and risk, but a calendar
+date alone must never manufacture market direction or an idea. Lean Radar needed
+that context without depending on the legacy calendar artifact pipeline.
+**Changes:**
+- Added a closed calendar model and strict local snapshot schema for FOMC, CPI,
+  PPI, PCE, employment, GDP, unlock, listing/delisting, and protocol events.
+  Genuine imports are confirmation-gated, reject fixture/test/mock/replay paths,
+  normalize aware clocks to UTC, validate credential-free HTTPS source URLs,
+  and retain the exact source-byte SHA-256.
+- Added calendar storage/readiness/query methods to the existing Lean SQLite
+  database plus `lean-radar-calendar-readiness` and
+  `lean-radar-calendar-import`; neither command calls a provider or sends.
+- Added deterministic idea overlays: macro context is global, crypto context
+  requires an exact affected symbol, and nearby events can raise risk/urgency
+  or shorten expiry. The context explicitly records that it is research-only,
+  creates no direction, and cannot bypass market setup detection.
+- Made optional calendar corruption fail soft for market scanning while surfacing
+  `calendar_status=unavailable_invalid`; valid market-led ideas are not hidden
+  because optional context is unavailable.
+- Added one small offline fixture and updated the product contract, operator
+  guide, durable decision, working agreement, and roadmap.
+**Verify:** Focused Lean plus exact Make/CLI contract tests pass 40/40 with
+external pytest plugins disabled. They prove strict taxonomy/time/source/secret
+handling, fixture-path rejection, fingerprinted persistence, read-only missing
+readiness, truthful past-only status, exact symbol/global overlays,
+risk/urgency adjustment, expiry cap,
+quiet-market zero-idea behavior, and scan safety. Python compileall passes; the
+product JSON parses; `git diff --check` passes; and
+`make architecture-cleanliness-check` passes every non-size gate with size
+inventory advisory. Actual Make-driven readiness left a missing database absent,
+then a confirmed genuine-copy import produced one context-only event and clean
+ready status. Full `verify-fast` was not repeated because the immediately prior
+scan-engine slice passed all 3,944 tests and this isolated follow-up has focused
+calendar/store/scan/CLI plus architecture coverage.
+**Notes/risks:** Live official acquisition and dashboard/Telegram rendering are
+still pending. The import is local-first and does not claim live coverage. No
+provider call, send, trade, order, paper trade, RSI write, or `TRIGGERED_FADE`
+occurred.
+
 ## 2026-07-23 — Add the first complete Lean market-scan engine · Codex
 **Why:** A venue-verified universe is useful only when it can turn fresh,
 unit-safe market evidence into a small set of honest operator review items. The

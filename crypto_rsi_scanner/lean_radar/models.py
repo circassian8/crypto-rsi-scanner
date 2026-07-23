@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 import math
+import re
 from typing import Mapping
+from urllib.parse import parse_qsl, urlsplit
 
 
 IDEA_TYPES = (
@@ -29,6 +31,24 @@ ROUTES = (
 )
 CATALOG_SOURCE_MODES = ("live_no_send", "imported_catalog", "fixture")
 MARKET_SOURCE_MODES = ("live_no_send", "imported_snapshot", "fixture")
+CALENDAR_CATEGORIES = (
+    "fomc",
+    "cpi",
+    "ppi",
+    "pce",
+    "employment_report",
+    "gdp",
+    "crypto_unlock",
+    "exchange_listing",
+    "exchange_delisting",
+    "protocol_event",
+)
+CALENDAR_IMPORTANCE = ("low", "medium", "high")
+CALENDAR_TIME_CERTAINTY = ("exact", "window", "date_only")
+_EVENT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$")
+_ASSET_SYMBOL = re.compile(r"^[A-Z0-9][A-Z0-9._-]{1,23}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_SECRET_QUERY_KEY = re.compile(r"(?:api.?key|authorization|secret|token)", re.I)
 
 
 class _LeanRadarModelError(ValueError):
@@ -310,6 +330,66 @@ class SetupDetection:
 
 
 @dataclass(frozen=True)
+class CalendarEvent:
+    event_id: str
+    title: str
+    category: str
+    starts_at: str
+    ends_at: str | None
+    time_certainty: str
+    importance: str
+    source_name: str
+    source_url: str | None
+    affected_symbols: tuple[str, ...]
+    source_observed_at: str
+    source_mode: str
+    source_sha256: str
+    context_only: bool = True
+    research_only: bool = True
+
+    def __post_init__(self) -> None:
+        event_id = _require_text(self.event_id, "event_id", maximum=160)
+        if not _EVENT_ID.fullmatch(event_id):
+            raise LeanRadarModelError("event_id is invalid")
+        _require_text(self.title, "title", maximum=300)
+        if self.category not in CALENDAR_CATEGORIES:
+            raise LeanRadarModelError("calendar category is invalid")
+        start = _require_timestamp(self.starts_at, "starts_at")
+        if self.ends_at is not None:
+            end = _require_timestamp(self.ends_at, "ends_at")
+            if _parsed_time(end) < _parsed_time(start):
+                raise LeanRadarModelError("calendar event ends before it starts")
+        if self.time_certainty not in CALENDAR_TIME_CERTAINTY:
+            raise LeanRadarModelError("calendar time_certainty is invalid")
+        if self.importance not in CALENDAR_IMPORTANCE:
+            raise LeanRadarModelError("calendar importance is invalid")
+        _require_text(self.source_name, "source_name", maximum=160)
+        if self.source_url is not None:
+            _require_safe_public_url(self.source_url)
+        if not isinstance(self.affected_symbols, tuple) or len(self.affected_symbols) > 100:
+            raise LeanRadarModelError("affected_symbols is invalid")
+        if len(set(self.affected_symbols)) != len(self.affected_symbols):
+            raise LeanRadarModelError("affected_symbols contains duplicates")
+        for symbol in self.affected_symbols:
+            if not isinstance(symbol, str) or not _ASSET_SYMBOL.fullmatch(symbol):
+                raise LeanRadarModelError("affected symbol is invalid")
+        _require_timestamp(self.source_observed_at, "source_observed_at")
+        if self.source_mode not in MARKET_SOURCE_MODES:
+            raise LeanRadarModelError("calendar source_mode is invalid")
+        if not isinstance(self.source_sha256, str) or not _SHA256.fullmatch(
+            self.source_sha256
+        ):
+            raise LeanRadarModelError("calendar source_sha256 is invalid")
+        if self.context_only is not True or self.research_only is not True:
+            raise LeanRadarModelError("calendar events must remain context-only research")
+
+    def to_dict(self) -> dict[str, object]:
+        payload = asdict(self)
+        payload["affected_symbols"] = list(self.affected_symbols)
+        return payload
+
+
+@dataclass(frozen=True)
 class LeanIdea:
     idea_id: str
     created_at: str
@@ -418,8 +498,12 @@ __all__ = (
     "IDEA_TYPES",
     "ROUTES",
     "CATALOG_SOURCE_MODES",
+    "CALENDAR_CATEGORIES",
+    "CALENDAR_IMPORTANCE",
+    "CALENDAR_TIME_CERTAINTY",
     "MARKET_SOURCE_MODES",
     "BybitInstrument",
+    "CalendarEvent",
     "LeanIdea",
     "LeanRadarModelError",
     "MarketFeatures",
@@ -427,3 +511,23 @@ __all__ = (
     "SetupDetection",
     "UniverseAsset",
 )
+
+
+def _parsed_time(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _require_safe_public_url(value: object) -> str:
+    text = _require_text(value, "source_url", maximum=2_048)
+    parsed = urlsplit(text)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+    ):
+        raise LeanRadarModelError("source_url must be a credential-free HTTPS URL")
+    if any(_SECRET_QUERY_KEY.search(key) for key, _value in parse_qsl(parsed.query)):
+        raise LeanRadarModelError("source_url contains a credential-like query key")
+    return text

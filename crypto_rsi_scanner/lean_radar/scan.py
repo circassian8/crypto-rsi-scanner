@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from typing import Callable, Mapping, Sequence
 
+from .calendar import FUTURE_CONTEXT_HOURS, PAST_CONTEXT_HOURS, context_for_idea
 from .config import LeanRadarSettings
 from .features import build_features
 from .ideas import build_idea
@@ -16,7 +17,7 @@ from .market_data import (
     normalize_snapshots,
 )
 from .setups import detect_setup
-from .store import LeanRadarStore
+from .store import LeanRadarStore, LeanRadarStoreError
 from .universe import build_universe
 
 
@@ -211,13 +212,38 @@ def run_scan(
             for row in snapshots
         }
         features = build_features(snapshots, histories, evaluated_at=now)
+        try:
+            calendar_events = store.list_calendar_events(
+                start=market_observed_at - timedelta(hours=PAST_CONTEXT_HOURS),
+                end=market_observed_at + timedelta(hours=FUTURE_CONTEXT_HOURS),
+            )
+            calendar_status = store.calendar_status(evaluated_at=market_observed_at)[
+                "status"
+            ]
+            calendar_warning = None
+        except (LeanRadarStoreError, TypeError, ValueError):
+            calendar_events = ()
+            calendar_status = "unavailable_invalid"
+            calendar_warning = "calendar context could not be read; market scan continued"
         ideas = []
         for feature in features:
             detection = detect_setup(feature)
             if detection is None:
                 continue
             context = (catalyst_context or {}).get(feature.snapshot.canonical_asset_id)
-            ideas.append(build_idea(feature, detection, catalyst_context=context))
+            calendar_context = context_for_idea(
+                calendar_events,
+                symbol=feature.snapshot.symbol,
+                evaluated_at=market_observed_at,
+            )
+            ideas.append(
+                build_idea(
+                    feature,
+                    detection,
+                    catalyst_context=context,
+                    calendar_context=calendar_context,
+                )
+            )
     except (TypeError, ValueError) as exc:
         if not provider_call_attempted:
             raise MarketDataError("local market evidence failed validation") from exc
@@ -260,6 +286,12 @@ def run_scan(
         "diagnostic_idea_count": sum(
             idea.idea_type == "diagnostic" for idea in ideas
         ),
+        "calendar_status": calendar_status,
+        "calendar_event_count": len(calendar_events),
+        "calendar_context_idea_count": sum(
+            idea.calendar_context.get("status") == "attached" for idea in ideas
+        ),
+        "calendar_warning": calendar_warning,
         "no_send": True,
         "research_only": True,
         **SAFETY_COUNTERS,

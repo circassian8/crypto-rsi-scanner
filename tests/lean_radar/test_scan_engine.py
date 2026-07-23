@@ -10,6 +10,7 @@ import pytest
 
 from crypto_rsi_scanner.lean_radar.config import LeanRadarSettings
 from crypto_rsi_scanner.lean_radar.cli import run
+from crypto_rsi_scanner.lean_radar.calendar import normalize_calendar_snapshot
 from crypto_rsi_scanner.lean_radar.features import build_features
 from crypto_rsi_scanner.lean_radar.ideas import build_idea
 from crypto_rsi_scanner.lean_radar.market_data import (
@@ -379,6 +380,99 @@ def test_end_to_end_scan_is_transactional_research_only_and_no_send(
         "triggered_fade_created",
     ):
         assert result[field] == 0
+
+
+def test_scan_attaches_calendar_risk_without_changing_market_direction(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    event_time = NOW + timedelta(minutes=30)
+    events = normalize_calendar_snapshot(
+        {
+            "schema_version": "lean_calendar_import_v1",
+            "source_observed_at": NOW.isoformat(),
+            "source_name": "Official macro fixture",
+            "events": [
+                {
+                    "event_id": "fomc-near-scan",
+                    "title": "Federal Reserve decision",
+                    "category": "fomc",
+                    "starts_at": event_time.isoformat(),
+                    "time_certainty": "exact",
+                    "importance": "high",
+                    "affected_symbols": [],
+                }
+            ],
+        },
+        source_mode="fixture",
+        source_sha256="9" * 64,
+    )
+    store.upsert_calendar_events(events, imported_at=NOW)
+
+    result = run_scan(
+        store,
+        LeanRadarSettings(db_path=store.path, cadence_minutes=20),
+        source_mode="fixture",
+        rows=_scan_rows(),
+        observed_at=NOW,
+        evaluated_at=NOW,
+    )
+
+    sol = next(
+        idea for idea in result["ideas"] if idea["canonical_asset_id"] == "solana"
+    )
+    assert result["calendar_status"] == "ready"
+    assert result["calendar_context_idea_count"] >= 1
+    assert sol["idea_type"] == "rapid_market_anomaly"
+    assert sol["directional_bias"] == "long"
+    assert sol["calendar_context"]["directional_bias_created"] is False
+    assert sol["expires_at"] == event_time.isoformat()
+
+
+def test_calendar_event_alone_does_not_create_an_idea(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    events = normalize_calendar_snapshot(
+        {
+            "schema_version": "lean_calendar_import_v1",
+            "source_observed_at": NOW.isoformat(),
+            "source_name": "Official macro fixture",
+            "events": [
+                {
+                    "event_id": "cpi-quiet-market",
+                    "title": "Consumer price index",
+                    "category": "cpi",
+                    "starts_at": (NOW + timedelta(hours=2)).isoformat(),
+                    "time_certainty": "exact",
+                    "importance": "high",
+                    "affected_symbols": [],
+                }
+            ],
+        },
+        source_mode="fixture",
+        source_sha256="8" * 64,
+    )
+    store.upsert_calendar_events(events, imported_at=NOW)
+    quiet_rows = [dict(row) for row in _scan_rows()]
+    for row in quiet_rows:
+        row["price_change_percentage_1h_in_currency"] = 0.0
+        row["price_change_percentage_24h_in_currency"] = 0.0
+        row["price_change_percentage_7d_in_currency"] = 0.0
+        row["total_volume"] = float(row["market_cap"]) * 0.01
+        row["sparkline_in_7d"] = {"price": _quiet_prices()}
+
+    result = run_scan(
+        store,
+        LeanRadarSettings(db_path=store.path, cadence_minutes=20),
+        source_mode="fixture",
+        rows=quiet_rows,
+        observed_at=NOW,
+        evaluated_at=NOW,
+    )
+
+    assert result["status"] == "complete"
+    assert result["calendar_event_count"] == 1
+    assert result["idea_count"] == 0
+    assert result["ideas"] == []
 
 
 def test_live_scan_without_authorization_never_calls_provider(tmp_path: Path) -> None:

@@ -37,12 +37,25 @@ def build_idea(
     detection: SetupDetection,
     *,
     catalyst_context: Mapping[str, object] | None = None,
+    calendar_context: Mapping[str, object] | None = None,
 ) -> LeanIdea:
     snapshot = features.snapshot
     catalyst_status = _catalyst_status(catalyst_context)
-    scored = score_setup(features, detection, catalyst_status=catalyst_status)
     created = datetime.fromisoformat(snapshot.observed_at.replace("Z", "+00:00"))
+    scored = score_setup(
+        features,
+        detection,
+        catalyst_status=catalyst_status,
+        calendar_context=calendar_context,
+        evaluated_at=created,
+    )
     expires = created + timedelta(hours=_TTL_HOURS[detection.idea_type])
+    calendar_values = dict(calendar_context or {})
+    next_event_at = calendar_values.get("next_event_at")
+    if isinstance(next_event_at, str):
+        event_time = datetime.fromisoformat(next_event_at.replace("Z", "+00:00"))
+        if created < event_time < expires:
+            expires = event_time
     missing: list[str] = []
     if catalyst_status == "unknown":
         missing.append("Known catalyst or explanation")
@@ -65,6 +78,10 @@ def build_idea(
         risks.append("Unknown catalyst increases explanation and manipulation risk")
     if snapshot.spread_bps is None:
         risks.append("Execution quality is not observed; strongest urgency is capped")
+    if calendar_values.get("status") == "attached":
+        risks.append(
+            "Scheduled calendar context may raise volatility; it creates no direction"
+        )
     return LeanIdea(
         idea_id=idea_id,
         created_at=created.astimezone(timezone.utc).isoformat(),
@@ -108,7 +125,7 @@ def build_idea(
             "baseline_status": features.baseline_status,
             "baseline_sample_count": features.baseline_sample_count,
         },
-        calendar_context={},
+        calendar_context=calendar_values,
         technical_context={
             "rsi_14": snapshot.rsi_14,
             "rsi_basis": snapshot.rsi_basis,

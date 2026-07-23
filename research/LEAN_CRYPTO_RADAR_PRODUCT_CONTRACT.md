@@ -1,8 +1,8 @@
 # Lean Crypto Radar V1 Product Contract
 
 Status: active product rebuild. The universe/store and market-scan engine are
-implemented; the dashboard, Telegram preview, calendar, and outcome slices
-remain in progress.
+implemented; the context-only calendar overlay is implemented; the dashboard,
+Telegram preview, and outcome slices remain in progress.
 
 ## Product
 
@@ -70,6 +70,22 @@ spread caps confidence and urgency. The initial rules are transparent V1 screens
 to be evaluated through outcomes; they are not estimated win probabilities and
 must not be tuned against sparse examples.
 
+## Implemented calendar contract
+
+The lean runtime accepts one confirmation-gated genuine local calendar snapshot
+with an explicit source name, acquisition time, credential-free HTTPS source
+URL when present, and SHA-256 of the exact imported bytes. The strict schema
+supports FOMC, CPI, PPI, PCE, employment, GDP, crypto unlock, exchange listing
+or delisting, and protocol events. Imported events remain in the same SQLite
+database; they do not create a new artifact family.
+
+Macro events can overlay every asset. Crypto-specific events overlay only an
+exact affected symbol. An event can raise risk and time-sensitive urgency and
+can shorten an existing idea's expiry, but it is always marked context-only and
+cannot create directional bias or an idea by itself. Missing or invalid
+calendar context remains a visible health limitation while the market scan
+continues. No live calendar provider is called by the import or readiness path.
+
 ## Hard gates and soft limitations
 
 Hard gates are unresolved identity, no confirmed Bybit USDT perpetual, stale or
@@ -115,13 +131,19 @@ make lean-radar-universe \
   LEAN_RADAR_MARKET_ROWS=/absolute/path/to/coingecko-markets.json \
   PYTHON=.venv/bin/python
 make lean-radar-scan PYTHON=.venv/bin/python
+make lean-radar-calendar-readiness PYTHON=.venv/bin/python
 ```
 
 The live scan command respects the already-present CoinGecko authorization and
 returns non-success before a provider call when authorization, catalog, or
-cadence readiness is absent. For a genuine offline snapshot:
+cadence readiness is absent. For a genuine local calendar and offline market
+snapshot:
 
 ```sh
+CONFIRM=1 make lean-radar-calendar-import \
+  LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/to/calendar.json \
+  PYTHON=.venv/bin/python
+
 make lean-radar-scan \
   LEAN_RADAR_MARKET_MODE=imported_snapshot \
   LEAN_RADAR_MARKET_ROWS=/absolute/path/to/coingecko-markets.json \

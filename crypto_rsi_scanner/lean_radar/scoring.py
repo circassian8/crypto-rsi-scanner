@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Mapping
+
+from .calendar import score_adjustments
 from .models import MarketFeatures, SetupDetection
 
 
@@ -32,6 +36,8 @@ def score_setup(
     detection: SetupDetection,
     *,
     catalyst_status: str = "unknown",
+    calendar_context: Mapping[str, object] | None = None,
+    evaluated_at: datetime,
 ) -> dict[str, object]:
     snapshot = features.snapshot
     actionability = _ACTION_BASE[detection.idea_type]
@@ -42,6 +48,12 @@ def score_setup(
     risk = 38.0 + features.chase_risk_score * 0.28
     urgency = _URGENCY_BASE[detection.idea_type]
     urgency += max(0.0, detection.strength - 60.0) * 0.15
+    calendar_risk, calendar_urgency = score_adjustments(
+        calendar_context,
+        evaluated_at=evaluated_at,
+    )
+    risk += calendar_risk
+    urgency += calendar_urgency
 
     if catalyst_status == "unknown":
         confidence -= 8.0

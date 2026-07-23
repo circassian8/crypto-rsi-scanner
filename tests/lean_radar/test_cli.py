@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -36,6 +37,66 @@ def test_catalog_import_requires_confirmation(tmp_path: Path) -> None:
     assert payload["status"] == "confirmation_required"
     assert payload["provider_call_attempted"] is False
     assert not database.exists()
+
+
+def test_calendar_readiness_is_observational_and_import_is_confirmed(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "lean.db"
+    calendar = tmp_path / "calendar.json"
+    calendar.write_text(
+        json.dumps(
+            {
+                "schema_version": "lean_calendar_import_v1",
+                "source_observed_at": "2026-07-23T12:00:00Z",
+                "source_name": "Official calendar bundle",
+                "events": [
+                    {
+                        "event_id": "cpi-2026-07-24",
+                        "title": "Consumer price index",
+                        "category": "cpi",
+                        "starts_at": "2026-07-24T12:30:00Z",
+                        "time_certainty": "exact",
+                        "importance": "high",
+                        "affected_symbols": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ready_code, ready = run(("--db", str(database), "calendar-readiness"))
+    blocked_code, blocked = run(
+        (
+            "--db",
+            str(database),
+            "calendar-import",
+            "--calendar",
+            str(calendar),
+        )
+    )
+
+    assert ready_code == 0
+    assert ready["status"] == "setup_required"
+    assert blocked_code == 2
+    assert blocked["status"] == "confirmation_required"
+    assert not database.exists()
+
+    import_code, imported = run(
+        (
+            "--db",
+            str(database),
+            "calendar-import",
+            "--calendar",
+            str(calendar),
+            "--confirm",
+        )
+    )
+    assert import_code == 0
+    assert imported["status"] == "imported"
+    assert imported["calendar_event_count"] == 1
+    assert database.exists()
 
 
 def test_make_readiness_is_no_write_and_names_the_safe_import(tmp_path: Path) -> None:

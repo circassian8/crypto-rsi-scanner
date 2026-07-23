@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Keep the Lean calendar context-only and local-first
+**Status:** accepted
+**Decision:** Lean Radar calendar readiness makes no provider call or write.
+The first producer is a confirmation-gated genuine local JSON import with a
+closed event taxonomy, exact aware clocks, source identity, credential-free
+HTTPS URL when present, and SHA-256 of the imported bytes. Store events in the
+existing Lean SQLite database. Macro categories may overlay all assets;
+crypto-specific categories require an exact affected symbol. Calendar context
+may raise risk/urgency and shorten an already detected market idea's expiry,
+but must remain context-only, create no directional bias, and create no idea on
+its own. Invalid optional calendar state is a visible health limitation, not a
+reason to hide otherwise valid market-led ideas.
+**Why:** Scheduled events materially change timing and risk, but turning a date
+into direction would fabricate evidence. A strict local-first import provides
+useful context without reintroducing the official-calendar artifact pipeline or
+crossing an unauthorized provider boundary.
+**Revisit when:** A specific official provider can be added behind an existing
+explicit authorization with bounded calls and identical event semantics.
+
 ## 2026-07-23 - Keep the first Lean scan transparent and point-in-time
 **Status:** accepted
 **Decision:** The Lean live scan requests one bounded CoinGecko market page in
