@@ -181,9 +181,13 @@ require a known catalyst to surface a liquid, timely market-led review item.
 - Do not add a lean feature unless it appears in the dashboard, Telegram
   preview, outcomes, health, or operator docs. Do not create a new artifact or
   evidence framework for this product.
-- `make lean-radar-readiness` is observational. `make lean-radar-scan` performs
-  at most one already-authorized, cadence-eligible CoinGecko market-list call,
-  ordered by 24-hour volume, and never sends. Genuine imported snapshots require
+- `make lean-radar` is the default observational entrypoint.
+  `make lean-radar-cycle` is the normal explicit no-send operating cycle: it
+  runs the scan, refreshes outcomes and health, and builds the Telegram preview.
+  It performs at most one already-authorized, cadence-eligible CoinGecko
+  market-list call ordered by 24-hour volume and never invokes delivery.
+  `make lean-radar-scan` remains the lower-level scan-only diagnostic. Genuine
+  imported snapshots require
   an explicit aware observation clock and reject fixture/test/mock/replay paths.
   Direct 1h/24h/7d percentage fields remain direct; Wilder RSI is explicitly a
   calculation over untimestamped 7-day-sparkline points. Never infer an exact
@@ -214,6 +218,11 @@ require a known catalyst to surface a liquid, timely market-led review item.
   invalid runtime state fails closed. The dashboard remains loopback-only and
   does not inherit legacy publication/pointer authority or phone-access state.
   `make lean-radar-dashboard-smoke` uses only a disposable fixture database.
+- Current dashboard and Telegram market ideas require the latest scan to be
+  complete and no older than two valid 15–30-minute cadences. A later failed or
+  invalid scan, or an aged completed scan, preserves stored ideas/observations/
+  outcomes as history but suppresses them from current lists and messages.
+  Independently timed calendar context remains visible and non-directional.
 - `make lean-radar-telegram-preview` is a read-only/no-send projection of the
   same canonical ideas; `make lean-radar-telegram-readiness` reports only
   secret-safe configuration booleans/counts. There is no urgent daily cap.
@@ -227,10 +236,10 @@ require a known catalyst to surface a liquid, timely market-led review item.
   render token or recipient values.
 
 The durable product contract is
-`research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md` / `.json`. During the rebuild,
-the implemented lean commands are the default product path; unimplemented
-surfaces must remain honestly pending rather than delegating through Event
-Alpha and calling that Lean Radar complete.
+`research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md` / `.json`. The implemented
+Lean commands are the default product path. Future additions must remain
+honestly pending rather than delegating through Event Alpha and calling them
+part of Lean Radar.
 
 ---
 

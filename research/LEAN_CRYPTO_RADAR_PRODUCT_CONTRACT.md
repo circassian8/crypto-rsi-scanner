@@ -214,7 +214,23 @@ trades. The database and WAL/SHM files are ignored from git and review exports.
 ## Default workflow
 
 ```sh
-make lean-radar-readiness PYTHON=.venv/bin/python
+make lean-radar PYTHON=.venv/bin/python
+make lean-radar-cycle PYTHON=.venv/bin/python
+make lean-radar-dashboard PYTHON=.venv/bin/python
+make lean-radar-telegram-preview PYTHON=.venv/bin/python
+make lean-radar-telegram-readiness PYTHON=.venv/bin/python
+```
+
+The first command is read-only. The cycle performs one cadence-gated scan,
+refreshes outcomes and operator health, and builds the Telegram preview. It
+never invokes delivery. It may make at most one CoinGecko request only when the
+existing authorization, genuine catalog, and cadence rules already allow it.
+The lower-level `lean-radar-scan`, `lean-radar-outcomes`, and
+`lean-radar-health` commands remain available for focused diagnostics.
+
+First-time setup remains explicit:
+
+```sh
 make lean-radar-bybit-universe-readiness PYTHON=.venv/bin/python
 CONFIRM=1 make lean-radar-bybit-universe-import \
   LEAN_RADAR_BYBIT_CATALOG=/absolute/path/to/instruments-info.json \
@@ -222,13 +238,7 @@ CONFIRM=1 make lean-radar-bybit-universe-import \
 make lean-radar-universe \
   LEAN_RADAR_MARKET_ROWS=/absolute/path/to/coingecko-markets.json \
   PYTHON=.venv/bin/python
-make lean-radar-scan PYTHON=.venv/bin/python
 make lean-radar-calendar-readiness PYTHON=.venv/bin/python
-make lean-radar-outcomes PYTHON=.venv/bin/python
-make lean-radar-health PYTHON=.venv/bin/python
-make lean-radar-dashboard PYTHON=.venv/bin/python
-make lean-radar-telegram-preview PYTHON=.venv/bin/python
-make lean-radar-telegram-readiness PYTHON=.venv/bin/python
 ```
 
 After inspecting preview/readiness, the separate optional real-send boundary is:
@@ -238,8 +248,8 @@ RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 \
   make lean-radar-telegram-send PYTHON=.venv/bin/python
 ```
 
-That command is never invoked by scanning, dashboard reads, preview, readiness,
-health, outcomes, or calendar work.
+That command is never invoked by the operator cycle, scanning, dashboard reads,
+preview, readiness, health, outcomes, or calendar work.
 
 The live scan command respects the already-present CoinGecko authorization and
 returns non-success before a provider call when authorization, catalog, or
@@ -251,7 +261,7 @@ CONFIRM=1 make lean-radar-calendar-import \
   LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/to/calendar.json \
   PYTHON=.venv/bin/python
 
-make lean-radar-scan \
+make lean-radar-cycle \
   LEAN_RADAR_MARKET_MODE=imported_snapshot \
   LEAN_RADAR_MARKET_ROWS=/absolute/path/to/coingecko-markets.json \
   LEAN_RADAR_MARKET_OBSERVED_AT=2026-07-23T12:00:00Z \

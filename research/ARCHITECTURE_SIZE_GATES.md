@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-23T04:19:04.323608+00:00`
+- generated_at: `2026-07-23T04:27:56.379560+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -115,7 +115,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/market_state.py:snapshot_from_market_row` | 175 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_hypothesis_latest_score_components` | 153 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row` | 160 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/cli.py:run` | 203 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/cli.py:run` | 179 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/dashboard_data.py:load_dashboard_state` | 168 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/health.py:refresh_system_health` | 200 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/scan.py:run_scan` | 247 |

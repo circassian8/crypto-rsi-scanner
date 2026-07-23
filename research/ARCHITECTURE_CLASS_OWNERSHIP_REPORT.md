@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-23T04:19:08.455096+00:00`
+- generated_at: `2026-07-23T04:28:00.627895+00:00`
 - public_class_count: `532`
 - classes_over_limit_count: `8`
 - functions_over_limit_count: `40`
@@ -355,7 +355,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.market_state` | `snapshot_from_market_row` | 175 | true |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_hypothesis_latest_score_components` | 153 | false |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 160 | false |
-| `crypto_rsi_scanner.lean_radar.cli` | `run` | 203 | true |
+| `crypto_rsi_scanner.lean_radar.cli` | `run` | 179 | true |
 | `crypto_rsi_scanner.lean_radar.dashboard_data` | `load_dashboard_state` | 168 | true |
 | `crypto_rsi_scanner.lean_radar.health` | `refresh_system_health` | 200 | true |
 | `crypto_rsi_scanner.lean_radar.scan` | `run_scan` | 247 | true |

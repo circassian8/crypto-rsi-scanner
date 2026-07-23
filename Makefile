@@ -277,10 +277,29 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
 .PHONY: radar-unlock-tokenomist-v5-smoke radar-unlock-tokenomist-v5-capture-smoke radar-unlock-tokenomist-v5-readiness
-.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health lean-radar-dashboard lean-radar-dashboard-smoke lean-radar-telegram-preview lean-radar-telegram-readiness lean-radar-telegram-send
+.PHONY: lean-radar lean-radar-cycle lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health lean-radar-dashboard lean-radar-dashboard-smoke lean-radar-telegram-preview lean-radar-telegram-readiness lean-radar-telegram-send
 
 help:
 	@echo "Targets:"
+	@echo "  Lean Radar primary workflow"
+	@echo "  make lean-radar  Show current setup/cadence/provider readiness; no call or write"
+	@echo "  make lean-radar-cycle  Run one explicit no-send scan/outcome/health/preview cycle; provider call only when already authorized and eligible"
+	@echo "  make lean-radar-dashboard  Serve the six-page read-only Lean dashboard on loopback"
+	@echo "  make lean-radar-telegram-preview  Render due Lean Telegram messages without sending or writing"
+	@echo "  make lean-radar-telegram-readiness  Inspect secret-safe preview and guarded-send readiness"
+	@echo "  RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 make lean-radar-telegram-send  Explicit guarded delivery of currently due messages"
+	@echo "  Lean Radar setup and diagnostics"
+	@echo "  make lean-radar-bybit-universe-readiness  Inspect the confirmed local Bybit USDT-perpetual catalog"
+	@echo "  CONFIRM=1 make lean-radar-bybit-universe-import LEAN_RADAR_BYBIT_CATALOG=/absolute/path/file.json  Import one genuine local catalog"
+	@echo "  make lean-radar-universe LEAN_RADAR_MARKET_ROWS=/absolute/path/markets.json  Intersect top-liquid assets and watchlist with confirmed Bybit perps"
+	@echo "  make lean-radar-calendar-readiness  Inspect the local context-only calendar; no provider call/write"
+	@echo "  CONFIRM=1 make lean-radar-calendar-import LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/calendar.json  Import a genuine local calendar snapshot"
+	@echo "  CONFIRM=1 make lean-radar-watchlist-add LEAN_RADAR_WATCHLIST_ASSET_ID=... LEAN_RADAR_WATCHLIST_SYMBOL=...  Add one blocked-until-verified watchlist asset"
+	@echo "  make lean-radar-health  Refresh bounded operator health; no provider call or send"
+	@echo "  make lean-radar-outcomes  Mature due horizons from retained point-in-time snapshots; no provider call"
+	@echo "  make lean-radar-scan  Lower-level scan-only command retained for diagnostics/imports"
+	@echo "  make lean-radar-dashboard-smoke  Render every Lean dashboard page offline"
+	@echo "  Verification and research tooling"
 	@echo "  make bootstrap  Create .venv and install hash-pinned requirements.txt"
 	@echo "  make dependency-tools  Install pinned uv and pip-audit tooling into the selected Python environment"
 	@echo "  make lock-dependencies  Resolve requirements.in into universal hash-pinned requirements.txt (UPGRADE=1 to refresh all pins)"
@@ -304,21 +323,6 @@ help:
 	@echo "  make test-pytest-durations  Run safe pytest with slowest-test timings"
 	@echo "  make test-pytest-parallel  Run safe pytest with xdist when installed; set PYTEST_WORKERS=N"
 	@echo "  make smoke-alerts  Render representative alerts without sending"
-	@echo "  make lean-radar-readiness  Show default Lean Radar setup state; no provider call/write"
-	@echo "  make lean-radar-bybit-universe-readiness  Inspect the confirmed local Bybit USDT-perpetual catalog"
-	@echo "  CONFIRM=1 make lean-radar-bybit-universe-import LEAN_RADAR_BYBIT_CATALOG=/absolute/path/file.json  Import one genuine local catalog"
-	@echo "  make lean-radar-universe LEAN_RADAR_MARKET_ROWS=/absolute/path/markets.json  Intersect top-liquid assets and watchlist with confirmed Bybit perps"
-	@echo "  make lean-radar-scan  Run one already-authorized CoinGecko no-send scan; use LEAN_RADAR_MARKET_MODE=imported_snapshot with an explicit file and UTC clock for offline import"
-	@echo "  make lean-radar-calendar-readiness  Inspect the local context-only calendar; no provider call/write"
-	@echo "  CONFIRM=1 make lean-radar-calendar-import LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/calendar.json  Import a genuine local calendar snapshot"
-	@echo "  make lean-radar-outcomes  Mature due horizons from retained point-in-time snapshots; no provider call"
-	@echo "  make lean-radar-health  Refresh bounded operator health; no provider call or send"
-	@echo "  make lean-radar-dashboard  Serve the six-page read-only Lean dashboard on loopback"
-	@echo "  make lean-radar-dashboard-smoke  Render every Lean dashboard page offline"
-	@echo "  make lean-radar-telegram-preview  Render due Lean Telegram messages without sending or writing"
-	@echo "  make lean-radar-telegram-readiness  Inspect secret-safe preview and guarded-send readiness"
-	@echo "  RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 make lean-radar-telegram-send  Explicit guarded delivery of currently due messages"
-	@echo "  CONFIRM=1 make lean-radar-watchlist-add LEAN_RADAR_WATCHLIST_ASSET_ID=... LEAN_RADAR_WATCHLIST_SYMBOL=...  Add one blocked-until-verified watchlist asset"
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
 	@echo "  make radar-research-protocol-check  Validate the frozen Decision Radar empirical protocol without providers or writes"
@@ -1383,6 +1387,8 @@ event-alpha-market-anomaly-smoke:
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict
 	@echo "Market-anomaly smoke artifacts under event_fade_cache/$(PROFILE)/."
 
+lean-radar: lean-radar-readiness
+
 lean-radar-readiness:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
@@ -1421,6 +1427,13 @@ lean-radar-scan:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
 		--db $(LEAN_RADAR_DB_PATH) scan \
+		--source-mode $(LEAN_RADAR_MARKET_MODE) \
+			$(LEAN_RADAR_MARKET_ROWS_ARG) $(LEAN_RADAR_MARKET_OBSERVED_AT_ARG)
+
+lean-radar-cycle:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) cycle \
 		--source-mode $(LEAN_RADAR_MARKET_MODE) \
 		$(LEAN_RADAR_MARKET_ROWS_ARG) $(LEAN_RADAR_MARKET_OBSERVED_AT_ARG)
 

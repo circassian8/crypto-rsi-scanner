@@ -5,22 +5,52 @@ human operator reviewing Bybit USDT-perpetual opportunities.
 
 ## Lean Crypto Radar (default product path)
 
-Lean Radar is the active product rebuild: one small SQLite runtime, a strict
-confirmed-Bybit universe, market-led setups that do not require a catalyst, and
-equal-priority dashboard and Telegram surfaces. Event Alpha remains available
-as optional Catalyst Context; Decision Radar and the Empirical Lab remain
-research infrastructure rather than the default operator gate.
-
-The implemented foundation imports a genuine locally supplied Bybit public
-instrument catalog and intersects it with the top 200 CoinGecko assets ranked
-by 24-hour volume plus the manual watchlist. A watchlist entry that has no exact
-active Bybit USDT perpetual remains visibly blocked/unverified. The scan engine
-then builds explicitly labeled market features, chooses at most one setup per
-asset, applies the four operator scores, and atomically stores snapshots, ideas,
-and health. These setup commands make no provider call or Telegram send:
+Lean Radar is the implemented default product: one small SQLite runtime, a
+strict confirmed-Bybit universe, market-led setups that do not require a
+catalyst, point-in-time outcomes, a six-page dashboard, and guarded Telegram
+attention routing. Start with the short operator loop:
 
 ```sh
-make lean-radar-readiness PYTHON=.venv/bin/python
+make lean-radar PYTHON=.venv/bin/python
+make lean-radar-cycle PYTHON=.venv/bin/python
+make lean-radar-dashboard PYTHON=.venv/bin/python
+```
+
+`lean-radar` is read-only and makes no provider call. `lean-radar-cycle` runs
+one cadence-gated scan, matures outcomes from retained observations, refreshes
+health, and builds the Telegram preview. It never sends Telegram or creates a
+trade/order/paper trade/RSI row. The scan crosses the CoinGecko boundary at most
+once, and only when the existing explicit authorization, catalog, and cadence
+checks already pass. Otherwise it returns exact safe guidance.
+
+Review notifications without sending:
+
+```sh
+make lean-radar-telegram-preview PYTHON=.venv/bin/python
+make lean-radar-telegram-readiness PYTHON=.venv/bin/python
+```
+
+Actual delivery remains a separate explicit boundary:
+
+```sh
+RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 \
+  make lean-radar-telegram-send PYTHON=.venv/bin/python
+```
+
+The dashboard and Telegram show market ideas only when the latest scan is
+complete and no older than two configured cadences. A later failed scan or an
+aged scan preserves prior observations, ideas, and outcomes for history, but
+cannot present those ideas as current. Independently timed calendar context
+remains visible and never creates direction.
+
+### First-time setup
+
+Import one genuine locally supplied Bybit public instrument catalog. Lean Radar
+intersects it with the top 200 CoinGecko assets ranked by 24-hour volume plus
+the manual watchlist; a missing or ambiguous active USDT perpetual stays
+blocked/unverified. These setup commands make no provider call or Telegram send:
+
+```sh
 make lean-radar-bybit-universe-readiness PYTHON=.venv/bin/python
 CONFIRM=1 make lean-radar-bybit-universe-import \
   LEAN_RADAR_BYBIT_CATALOG=/absolute/path/to/instruments-info.json \
@@ -30,13 +60,9 @@ make lean-radar-universe \
   PYTHON=.venv/bin/python
 ```
 
-After the existing CoinGecko authorization is present, run one cadence-gated,
-no-send scan with `make lean-radar-scan PYTHON=.venv/bin/python`. It requests the
-CoinGecko market list in 24-hour-volume order. Direct percentage fields remain
-direct. Wilder RSI is visibly labeled as a calculation over untimestamped
-sparkline points, and the engine does not pretend array offsets are exact 4-hour
-bars. Without authorization, readiness and scan fail before the provider
-boundary.
+The lower-level `make lean-radar-scan` command remains available for focused
+diagnostics and imported snapshots. The normal operator command is
+`make lean-radar-cycle`.
 
 Calendar context is also available without a live call. Check it with
 `make lean-radar-calendar-readiness`; import a genuine operator-downloaded
@@ -50,16 +76,14 @@ CONFIRM=1 make lean-radar-calendar-import \
 Scheduled events can raise risk/urgency and shorten an existing idea, but never
 create a long or short idea by themselves.
 
-The import rejects checked-in fixture/test/mock/replay paths and never infers
+The imports reject checked-in fixture/test/mock/replay paths and never infer
 authorization. The runtime database is ignored from git and contains no order,
-position, portfolio, account, or paper-trading tables. See the
+position, portfolio, account, or paper-trading tables. Event Alpha remains
+optional Catalyst Context; Decision Radar and the Empirical Lab remain research
+infrastructure rather than default operator gates. See the
 [Lean Radar product contract](research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md).
 
-The six-page dashboard, Telegram preview/readiness, and outcome maturation are
-the next vertical slices. Until they land, the existing
-Decision Radar dashboard remains available as a research/compatibility surface.
-
-## Existing Decision Radar dashboard (research/compatibility)
+## Legacy Decision Radar research toolbox (optional)
 
 `make radar-dashboard` serves the current Crypto Decision Radar operator
 generation at `http://127.0.0.1:8765/`. The seven-page terminal covers Today,

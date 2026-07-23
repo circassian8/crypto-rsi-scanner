@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
@@ -11,10 +11,11 @@ from typing import Mapping, Sequence
 
 from .bybit_universe import BybitUniverseError, load_catalog
 from .calendar import LeanCalendarError, load_calendar_snapshot
-from .config import LeanRadarConfigError, load_settings
+from .config import LeanRadarConfigError, LeanRadarSettings, load_settings
 from .health import refresh_system_health
 from .market_data import MarketDataError, live_provider_authorized
 from .outcomes import LeanOutcomeError, refresh_outcomes
+from .safety import SAFETY_COUNTERS
 from .scan import run_scan, scan_readiness
 from .store import LeanRadarStore, LeanRadarStoreError
 from .telegram import (
@@ -78,6 +79,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     scan.add_argument("--markets", type=Path)
     scan.add_argument("--observed-at", type=_time)
+    cycle = subparsers.add_parser("cycle")
+    cycle.add_argument(
+        "--source-mode",
+        choices=("live_no_send", "imported_snapshot", "fixture"),
+        default="live_no_send",
+    )
+    cycle.add_argument("--markets", type=Path)
+    cycle.add_argument("--observed-at", type=_time)
     return parser
 
 
@@ -110,6 +119,8 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
             settings,
             evaluated_at=args.evaluated_at,
         )
+    if args.command == "cycle":
+        return _run_cycle(args, store, settings)
     if args.command == "calendar-readiness":
         calendar = store.calendar_status()
         return 0, {
@@ -119,7 +130,7 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
             "telegram_send_attempted": False,
             "research_only": True,
             "next_safe_command": (
-                "make lean-radar-scan"
+                "make lean-radar-cycle"
                 if calendar["status"] == "ready"
                 else "CONFIRM=1 make lean-radar-calendar-import "
                 "LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/to/calendar.json"
@@ -147,7 +158,7 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
             "provider_call_attempted": False,
             "telegram_send_attempted": False,
             "research_only": True,
-            "next_safe_command": "make lean-radar-scan",
+            "next_safe_command": "make lean-radar-cycle",
         }
     if args.command in {"readiness", "bybit-readiness"}:
         catalog = store.catalog_status()
@@ -169,7 +180,7 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
         elif args.command == "bybit-readiness":
             next_safe_command = "make lean-radar-universe"
         elif ready:
-            next_safe_command = "make lean-radar-scan"
+            next_safe_command = "make lean-radar-cycle"
         elif not live_provider_authorized():
             next_safe_command = (
                 "authorize CoinGecko under the existing provider policy, then run "
@@ -255,33 +266,7 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
             ),
         }
     if args.command == "scan":
-        if args.source_mode == "live_no_send":
-            if args.markets is not None or args.observed_at is not None:
-                raise MarketDataError(
-                    "live scan does not accept local market rows or an observation clock"
-                )
-            result = run_scan(
-                store,
-                settings,
-                source_mode="live_no_send",
-            )
-            return (0 if result.get("status") == "complete" else 2), result
-        if args.markets is None or args.observed_at is None:
-            raise MarketDataError(
-                "local scan requires --markets and --observed-at"
-            )
-        rows = load_market_rows(
-            args.markets,
-            require_genuine=args.source_mode == "imported_snapshot",
-        )
-        result = run_scan(
-            store,
-            settings,
-            source_mode=args.source_mode,
-            rows=rows,
-            observed_at=args.observed_at,
-            evaluated_at=args.observed_at,
-        )
+        result = _execute_scan(args, store, settings)
         return (0 if result.get("status") == "complete" else 2), result
     raise AssertionError("unreachable command")
 
@@ -324,6 +309,26 @@ def render_summary(payload: Mapping[str, object]) -> str:
         lines.append(
             f"Telegram: {payload.get('telegram_mode', 'disabled_no_send')} · no send"
         )
+    scan = payload.get("scan")
+    if isinstance(scan, Mapping):
+        lines.append(
+            f"Scan: {scan.get('status', 'unknown')} · "
+            f"{scan.get('snapshot_count', 0)} snapshots · "
+            f"{scan.get('idea_count', 0)} ideas"
+        )
+    cycle_outcomes = payload.get("outcomes")
+    if isinstance(cycle_outcomes, Mapping):
+        lines.append(
+            f"Outcomes: {cycle_outcomes.get('status', 'unknown')} · "
+            f"{cycle_outcomes.get('matured_count', 0)} matured · "
+            f"{cycle_outcomes.get('pending_count', 0)} pending"
+        )
+    preview = payload.get("telegram_preview")
+    if isinstance(preview, Mapping):
+        lines.append(
+            f"Telegram preview: {preview.get('message_count', 0)} messages · "
+            f"{preview.get('due_item_count', 0)} due items · no send"
+        )
     errors = payload.get("errors")
     if isinstance(errors, list) and errors:
         lines.append("Attention: " + "; ".join(str(value) for value in errors[:4]))
@@ -365,7 +370,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         forwarded.extend(("--note", args.note))
         if args.confirm:
             forwarded.append("--confirm")
-    elif args.command == "scan":
+    elif args.command in {"scan", "cycle"}:
         forwarded.extend(("--source-mode", args.source_mode))
         if args.markets:
             forwarded.extend(("--markets", str(args.markets)))
@@ -411,6 +416,183 @@ def main(argv: Sequence[str] | None = None) -> int:
         output = render_summary(payload)
     print(output)
     return code
+
+
+def _execute_scan(
+    args: argparse.Namespace,
+    store: LeanRadarStore,
+    settings: LeanRadarSettings,
+) -> dict[str, object]:
+    if args.source_mode == "live_no_send":
+        if args.markets is not None or args.observed_at is not None:
+            raise MarketDataError(
+                "live scan does not accept local market rows or an observation clock"
+            )
+        return run_scan(
+            store,
+            settings,
+            source_mode="live_no_send",
+        )
+    if args.markets is None or args.observed_at is None:
+        raise MarketDataError("local scan requires --markets and --observed-at")
+    rows = load_market_rows(
+        args.markets,
+        require_genuine=args.source_mode == "imported_snapshot",
+    )
+    return run_scan(
+        store,
+        settings,
+        source_mode=args.source_mode,
+        rows=rows,
+        observed_at=args.observed_at,
+        evaluated_at=args.observed_at,
+    )
+
+
+def _run_cycle(
+    args: argparse.Namespace,
+    store: LeanRadarStore,
+    settings: LeanRadarSettings,
+) -> tuple[int, dict[str, object]]:
+    """Run one explicit no-send scan/outcome/health/preview sequence."""
+
+    try:
+        scan = _execute_scan(args, store, settings)
+    except (LeanUniverseError, MarketDataError) as exc:
+        scan = {
+            "status": "blocked",
+            "reason": str(exc),
+            "source_mode": args.source_mode,
+            "provider_call_attempted": False,
+            "provider_call_succeeded": False,
+        }
+    cycle_at = _cycle_clock(args, scan)
+    try:
+        outcomes = refresh_outcomes(store, evaluated_at=cycle_at)
+    except (LeanOutcomeError, LeanRadarStoreError, TypeError, ValueError):
+        outcomes = {
+            "status": "blocked",
+            "reason": "retained outcome evidence could not be refreshed",
+            "provider_call_attempted": False,
+            "telegram_send_attempted": False,
+        }
+    health = refresh_system_health(store, settings, evaluated_at=cycle_at)
+    try:
+        preview = build_telegram_plan(store, evaluated_at=cycle_at)
+    except LeanTelegramError:
+        preview = {
+            "status": "blocked",
+            "reason": "Telegram preview state could not be validated",
+            "message_count": 0,
+            "due_item_count": 0,
+            "suppressed_count": 0,
+            "market_idea_freshness": "unavailable",
+        }
+    scan_status = str(scan.get("status", "blocked"))
+    if (
+        scan_status == "complete"
+        and outcomes.get("status") != "blocked"
+        and preview.get("status") != "blocked"
+    ):
+        status, code = "complete", 0
+    elif scan.get("cadence_eligible") is False and scan.get("provider_call_attempted") is False:
+        status, code = "waiting", 0
+    elif scan_status in {"provider_failed", "market_data_blocked"}:
+        status, code = "failed", 2
+    else:
+        status, code = "blocked", 2
+    next_safe_command = (
+        "make lean-radar-dashboard"
+        if status == "complete"
+        else health.get("next_safe_command", "make lean-radar")
+    )
+    payload = {
+        "schema_version": "lean_operator_cycle_v1",
+        "status": status,
+        "source_mode": args.source_mode,
+        "scan": _scan_cycle_summary(scan),
+        "outcomes": _outcome_cycle_summary(outcomes),
+        "health": {
+            "status": health.get("status", "unavailable"),
+            "data_freshness": health.get("data_freshness", "unavailable"),
+            "current_provider_call_eligibility": health.get(
+                "current_provider_call_eligibility", "unavailable"
+            ),
+        },
+        "telegram_preview": {
+            "status": preview.get("status", "unavailable"),
+            "message_count": preview.get("message_count", 0),
+            "due_item_count": preview.get("due_item_count", 0),
+            "suppressed_count": preview.get("suppressed_count", 0),
+            "market_idea_freshness": preview.get(
+                "market_idea_freshness", "unavailable"
+            ),
+        },
+        "provider_call_attempted": scan.get("provider_call_attempted") is True,
+        "provider_call_succeeded": scan.get("provider_call_succeeded") is True,
+        "telegram_send_attempted": False,
+        "database_write_attempted": store.path.exists(),
+        "no_send": True,
+        "research_only": True,
+        "next_safe_command": next_safe_command,
+        **SAFETY_COUNTERS,
+    }
+    return code, payload
+
+
+def _scan_cycle_summary(scan: Mapping[str, object]) -> dict[str, object]:
+    return {
+        key: scan.get(key)
+        for key in (
+            "status",
+            "reason",
+            "reasons",
+            "source_mode",
+            "scan_id",
+            "observed_at",
+            "next_scan_at",
+            "cadence_minutes",
+            "cadence_eligible",
+            "provider_call_attempted",
+            "provider_call_succeeded",
+            "snapshot_count",
+            "idea_count",
+            "outcome_placeholder_count",
+        )
+        if key in scan
+    }
+
+
+def _outcome_cycle_summary(outcomes: Mapping[str, object]) -> dict[str, object]:
+    return {
+        key: outcomes.get(key)
+        for key in (
+            "status",
+            "reason",
+            "outcome_count",
+            "matured_count",
+            "pending_count",
+            "unresolved_count",
+        )
+        if key in outcomes
+    }
+
+
+def _cycle_clock(
+    args: argparse.Namespace,
+    scan: Mapping[str, object],
+) -> datetime:
+    if args.observed_at is not None:
+        return args.observed_at.astimezone(timezone.utc)
+    checked_at = scan.get("checked_at")
+    if isinstance(checked_at, str):
+        try:
+            parsed = datetime.fromisoformat(checked_at.replace("Z", "+00:00"))
+        except ValueError:
+            parsed = None
+        if parsed is not None and parsed.tzinfo is not None:
+            return parsed.astimezone(timezone.utc)
+    return datetime.now(timezone.utc)
 
 
 def _time(value: str) -> datetime:

@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Make the Lean no-send cycle the default workflow · Codex
+**Why:** The completed Lean surfaces still required the operator to remember
+and reconcile separate scan, outcome, health, and preview commands, while the
+README continued to describe implemented surfaces as future work.
+**Changes:**
+- Added `make lean-radar` as the read-only status entrypoint and
+  `make lean-radar-cycle` as one explicit scan → outcome → health → Telegram-
+  preview sequence. The cycle has no delivery call, keeps the existing cadence/
+  catalog/authorization gate, and can cross the market-provider boundary at
+  most once.
+- Added a bounded cycle result with allowlisted scan/outcome/health/preview
+  truth, exact provider/send/write flags, all zero safety counters, and one next
+  safe command. Provider failure still records scan truth before health and the
+  shared current-scan gate suppresses old ideas.
+- Kept scan/outcome/health as lower-level diagnostic commands and kept the real
+  Telegram send behind its existing environment plus confirmation guards.
+  Reordered Make help so the five normal Lean commands appear before setup,
+  verification, and legacy research tooling.
+- Rewrote the README default path, updated the Markdown/JSON product contract,
+  working agreement, roadmap, and durable decision. Event Alpha, Decision
+  Radar, and the Empirical Lab remain available but are no longer presented as
+  the primary operator loop.
+- Added an end-to-end offline cycle test and a missing-runtime Make proof. The
+  former exercises all four stages without consuming Telegram dedupe; the
+  latter returns safe setup guidance without a provider call or database file.
+**Verify:** All 77 Lean Radar tests pass with external pytest plugins disabled.
+Python compileall, product-contract JSON validation, the six-page dashboard
+smoke, architecture cleanliness (all non-size gates clean; size findings
+advisory), and `git diff --check` pass.
+**Notes/risks:** No live cycle or real Telegram send was invoked. No provider
+call, trade, order, paper trade, normal RSI write, or `TRIGGERED_FADE` occurred.
+
 ## 2026-07-23 — Hide Lean ideas when the latest scan is not current · Codex
 **Why:** A failed provider attempt intentionally preserves the prior successful
 ideas for audit/history, but those rows must never remain operator-visible as

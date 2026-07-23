@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Make one no-send cycle the normal Lean operating command
+**Status:** accepted
+**Decision:** `make lean-radar` is the read-only default status entrypoint and
+`make lean-radar-cycle` is the normal explicit operating command. One cycle
+runs the cadence-gated market scan, refreshes point-in-time outcomes and local
+health, and builds the Telegram preview. It may make at most one already-
+authorized provider request and can never invoke Telegram delivery. Dashboard,
+preview, readiness, and the separately double-guarded send remain explicit
+commands. Keep scan/outcome/health commands as lower-level diagnostics and keep
+legacy Decision Radar/Event Alpha commands available but secondary.
+**Why:** One operator should not have to remember or manually reconcile four
+normal maintenance steps, while a read-only status command and separate send
+boundary keep provider and notification activity obvious.
+**Revisit when:** Real operation needs a confirmed scheduler or another cycle
+stage. Any addition must preserve the one-call bound, no-send default, current-
+scan gate, and exact side-effect reporting.
+
 ## 2026-07-23 - Require current scan truth before showing current Lean ideas
 **Status:** accepted
 **Decision:** A Lean market idea is current only when the latest persisted scan

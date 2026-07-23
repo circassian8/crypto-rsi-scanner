@@ -252,7 +252,7 @@ def _next_safe_command(
         )
     if not cadence_eligible:
         return "run make lean-radar-health after the displayed next-scan time"
-    return "make lean-radar-scan"
+    return "make lean-radar-cycle"
 
 
 def _text_time(payload: Mapping[str, object], key: str) -> str | None:

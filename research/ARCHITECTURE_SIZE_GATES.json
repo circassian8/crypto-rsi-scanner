@@ -2328,7 +2328,7 @@
     },
     {
       "function_name": "run",
-      "line_count": 203,
+      "line_count": 179,
       "module": "crypto_rsi_scanner.lean_radar.cli",
       "public": true,
       "qualname": "run",
@@ -2369,7 +2369,7 @@
   ],
   "functions_over_limit_count": 40,
   "gate_status": "pass",
-  "generated_at": "2026-07-23T04:19:04.323608+00:00",
+  "generated_at": "2026-07-23T04:27:56.379560+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -5143,7 +5143,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "run",
-      "line_count": 203,
+      "line_count": 179,
       "module": "crypto_rsi_scanner.lean_radar.cli",
       "public": true,
       "qualname": "run",
@@ -5884,7 +5884,7 @@
     },
     {
       "function_name": "run",
-      "line_count": 203,
+      "line_count": 179,
       "module": "crypto_rsi_scanner.lean_radar.cli",
       "public": true,
       "qualname": "run",
@@ -7442,7 +7442,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "run",
-      "line_count": 203,
+      "line_count": 179,
       "module": "crypto_rsi_scanner.lean_radar.cli",
       "public": true,
       "qualname": "run",

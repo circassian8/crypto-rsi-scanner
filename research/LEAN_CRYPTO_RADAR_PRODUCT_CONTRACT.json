@@ -6,6 +6,7 @@
   "implementation_state": {
     "bybit_universe_and_store_foundation": "implemented",
     "scan_and_idea_detection": "implemented",
+    "default_no_send_operator_cycle": "implemented",
     "dashboard": "implemented",
     "telegram_preview": "implemented",
     "calendar": "implemented",
@@ -25,6 +26,21 @@
     "default": 20,
     "minimum": 15,
     "maximum": 30
+  },
+  "default_operator_workflow": {
+    "read_only_status_command": "make lean-radar",
+    "no_send_cycle_command": "make lean-radar-cycle",
+    "dashboard_command": "make lean-radar-dashboard",
+    "telegram_preview_command": "make lean-radar-telegram-preview",
+    "cycle_stages": [
+      "cadence_gated_market_scan",
+      "point_in_time_outcome_refresh",
+      "operator_health_refresh",
+      "telegram_preview"
+    ],
+    "maximum_provider_calls": 1,
+    "requires_existing_provider_authorization": true,
+    "telegram_delivery_invoked": false
   },
   "market_scan": {
     "live_provider": "coingecko_coins_markets",
