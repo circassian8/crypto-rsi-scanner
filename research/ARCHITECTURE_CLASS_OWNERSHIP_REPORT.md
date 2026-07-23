@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-23T04:07:56.715697+00:00`
+- generated_at: `2026-07-23T04:19:08.455096+00:00`
 - public_class_count: `532`
 - classes_over_limit_count: `8`
 - functions_over_limit_count: `40`
@@ -307,7 +307,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | module | class | lines | public | accepted | exception |
 |---|---|---:|---:|---:|---|
-| `crypto_rsi_scanner.lean_radar.dashboard` | `LeanRadarDashboardApp` | 79 | true | false |  |
+| `crypto_rsi_scanner.lean_radar.dashboard` | `LeanRadarDashboardApp` | 88 | true | false |  |
 | `crypto_rsi_scanner.lean_radar.models` | `MarketSnapshot` | 78 | true | false |  |
 | `crypto_rsi_scanner.lean_radar.models` | `LeanIdea` | 104 | true | false |  |
 | `crypto_rsi_scanner.lean_radar.models` | `LeanOutcome` | 123 | true | false |  |
@@ -356,7 +356,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_hypothesis_latest_score_components` | 153 | false |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 160 | false |
 | `crypto_rsi_scanner.lean_radar.cli` | `run` | 203 | true |
-| `crypto_rsi_scanner.lean_radar.dashboard_data` | `load_dashboard_state` | 151 | true |
-| `crypto_rsi_scanner.lean_radar.health` | `refresh_system_health` | 193 | true |
-| `crypto_rsi_scanner.lean_radar.scan` | `run_scan` | 246 | true |
+| `crypto_rsi_scanner.lean_radar.dashboard_data` | `load_dashboard_state` | 168 | true |
+| `crypto_rsi_scanner.lean_radar.health` | `refresh_system_health` | 200 | true |
+| `crypto_rsi_scanner.lean_radar.scan` | `run_scan` | 247 | true |
 | `crypto_rsi_scanner.lean_radar.universe` | `build_universe` | 181 | true |

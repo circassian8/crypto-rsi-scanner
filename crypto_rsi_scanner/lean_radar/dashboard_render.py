@@ -128,8 +128,10 @@ def _shell(
 ) -> str:
     health = state.health_status or {}
     scan = state.scan_status or {}
-    freshness = str(health.get("data_freshness", "unavailable"))
+    freshness = state.market_idea_freshness
     health_status = str(health.get("status", "not_run"))
+    if state.suppressed_active_idea_count:
+        health_status = "attention"
     source_mode = str(scan.get("source_mode", "unavailable"))
     source_label = {
         "live_no_send": "Live no-send",
@@ -141,13 +143,22 @@ def _shell(
         f'<span class="nav-dot"></span>{escape(label)}</a>'
         for href, label in NAVIGATION
     )
-    warning = ""
+    warnings: list[str] = []
     if state.truncated_sections:
-        warning = (
+        warnings.append(
             '<div class="banner warn"><strong>Bounded view:</strong> '
             + escape(", ".join(_human(value) for value in state.truncated_sections))
             + " history is truncated. Current operator rows remain visible.</div>"
         )
+    if state.suppressed_active_idea_count:
+        warnings.append(
+            '<div class="banner warn"><strong>Current ideas hidden:</strong> '
+            f"{state.suppressed_active_idea_count} stored idea"
+            f"{'s are' if state.suppressed_active_idea_count != 1 else ' is'} "
+            f"not shown because the latest scan is {escape(_human(freshness).lower())}."
+            " Historical evidence remains available.</div>"
+        )
+    warning = "".join(warnings)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><title>{escape(title)} · Crypto Radar</title>
@@ -180,7 +191,12 @@ def _today(state: _LeanDashboardState) -> str:
     fade_count = sum(idea.idea_type == "exhaustion_or_fade_review" for idea in visible)
     health = state.health_status or {}
     scan = state.scan_status or {}
-    errors = health.get("errors") if isinstance(health.get("errors"), list) else []
+    errors = list(health.get("errors")) if isinstance(health.get("errors"), list) else []
+    if state.suppressed_active_idea_count:
+        errors.append(
+            f"{state.suppressed_active_idea_count} stored ideas are hidden because "
+            f"the latest scan is {state.market_idea_freshness}"
+        )
     next_scan = health.get("next_scan_at") or scan.get("next_scan_at")
     metrics = _metrics(
         (
@@ -214,7 +230,7 @@ def _today(state: _LeanDashboardState) -> str:
         + _fact("Status", _human(str(scan.get("status", "not run"))))
         + _fact("Observed", _when(scan.get("observed_at"), state.loaded_at))
         + _fact("Next eligible", _when(next_scan, state.loaded_at))
-        + _fact("Freshness", _human(str(health.get("data_freshness", "unavailable"))))
+        + _fact("Freshness", _human(state.market_idea_freshness))
         + "</div>",
         eyebrow="Point-in-time state",
     )
@@ -320,10 +336,24 @@ def _market(state: _LeanDashboardState) -> str:
         (
             ("Observed assets", str(len(rows)), "Latest point per asset"),
             ("Bybit instruments", str(state.catalog_count), "Confirmed catalog"),
-            ("Data source", source_label, "No provider call on page load"),
+            (
+                "Data source",
+                source_label,
+                f"{_human(state.market_idea_freshness)} · no provider call on page load",
+            ),
             ("Observed", _when(scan.get("observed_at"), state.loaded_at), "UTC"),
         )
     )
+    freshness_panel = ""
+    if state.market_idea_freshness != "current":
+        freshness_panel = _panel(
+            "Historical market snapshot",
+            "<p>The rows below remain useful as retained evidence, but the latest "
+            f"scan is {escape(_human(state.market_idea_freshness).lower())}. "
+            "They do not support current ideas or Telegram alerts.</p>",
+            eyebrow="Not current operator truth",
+            tone="warn",
+        )
     if not rows:
         return header + metrics + _empty(
             "No market observations yet",
@@ -338,7 +368,7 @@ def _market(state: _LeanDashboardState) -> str:
 <td>{_badge(_human(row.data_quality), _tone(row.data_quality))}<small>{_when(row.observed_at, state.loaded_at)}</small></td></tr>"""
         for row in rows
     )
-    return header + metrics + _table(
+    return header + metrics + freshness_panel + _table(
         ("Asset", "Price", "1h", "24h", "7d", "24h volume", "RSI", "7d path", "Data"),
         body,
         "market-table",
@@ -434,8 +464,14 @@ def _health(state: _LeanDashboardState) -> str:
     health = state.health_status or {}
     scan = state.scan_status or {}
     outcomes = state.outcome_status or {}
-    errors = health.get("errors") if isinstance(health.get("errors"), list) else []
+    errors = list(health.get("errors")) if isinstance(health.get("errors"), list) else []
     status = str(health.get("status", "not_run"))
+    if state.suppressed_active_idea_count:
+        status = "attention"
+        errors.append(
+            f"{state.suppressed_active_idea_count} stored ideas are hidden because "
+            f"the latest scan is {state.market_idea_freshness}"
+        )
     provider_current = _human(str(health.get("current_authorization_status", "not checked")))
     source_label = {
         "live_no_send": "Live no-send",
@@ -457,7 +493,7 @@ def _health(state: _LeanDashboardState) -> str:
         (
             _health_card(
                 "Market data",
-                _human(str(health.get("data_freshness", "unavailable"))),
+                _human(state.market_idea_freshness),
                 f"{source_label} · last scan {_when(health.get('last_scan_at') or scan.get('observed_at'), state.loaded_at)}",
             ),
             _health_card(
@@ -551,6 +587,21 @@ def _idea_detail(state: _LeanDashboardState, detail: _LeanIdeaDetail) -> str:
     if len(prices) < 2 and history:
         prices = history[-1].sparkline_prices
     back = '<a class="back-link" href="/ideas">← Back to ideas</a>'
+    is_current = any(row.idea_id == idea.idea_id for row in state.active_ideas)
+    historical = ""
+    if not is_current:
+        explanation = (
+            f"The latest scan is {_human(state.market_idea_freshness).lower()}, so this "
+            "stored idea is historical and is not a current operator action."
+            if state.suppressed_active_idea_count
+            else "This stored idea is no longer active and is shown only for historical review."
+        )
+        historical = _panel(
+            "Historical idea",
+            f"<p>{escape(explanation)}</p>",
+            eyebrow="Not current operator truth",
+            tone="warn",
+        )
     title = f"""<section class="detail-head"><div>{back}<div class="idea-heading">
 <span class="symbol-orb">{escape(idea.symbol[:5])}</span><div><p class="eyebrow">{escape(IDEA_LABELS.get(idea.idea_type, _human(idea.idea_type)))}</p>
 <h2>{escape(idea.symbol)} <small>{escape(idea.bybit_instrument)}</small></h2>
@@ -581,7 +632,7 @@ def _idea_detail(state: _LeanDashboardState, detail: _LeanIdeaDetail) -> str:
     ) + "</div>"
     context = _detail_context(idea, now=state.loaded_at)
     outcomes = _detail_outcomes(detail.outcomes)
-    return title + scores + charts + narrative + context + outcomes
+    return historical + title + scores + charts + narrative + context + outcomes
 
 
 def _detail_context(idea: LeanIdea, *, now: datetime) -> str:
@@ -876,7 +927,7 @@ def _human(value: str) -> str:
 
 def _tone(value: str) -> str:
     lowered = value.casefold()
-    if any(token in lowered for token in ("ready", "complete", "fresh", "known", "confirmed", "continued", "validated", "adequate", "observed", "high")):
+    if any(token in lowered for token in ("ready", "complete", "fresh", "current", "known", "confirmed", "continued", "validated", "adequate", "observed", "high")):
         return "good"
     if any(token in lowered for token in ("urgent", "rapid", "active", "look", "long")):
         return "accent"

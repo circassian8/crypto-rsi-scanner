@@ -1750,7 +1750,7 @@
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 79,
+      "line_count": 88,
       "module": "crypto_rsi_scanner.lean_radar.dashboard",
       "owner_note": "",
       "public": true,
@@ -1913,7 +1913,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1217,
+  "file_count": 1218,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -2336,7 +2336,7 @@
     },
     {
       "function_name": "load_dashboard_state",
-      "line_count": 151,
+      "line_count": 168,
       "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
       "public": true,
       "qualname": "load_dashboard_state",
@@ -2344,7 +2344,7 @@
     },
     {
       "function_name": "refresh_system_health",
-      "line_count": 193,
+      "line_count": 200,
       "module": "crypto_rsi_scanner.lean_radar.health",
       "public": true,
       "qualname": "refresh_system_health",
@@ -2352,7 +2352,7 @@
     },
     {
       "function_name": "run_scan",
-      "line_count": 246,
+      "line_count": 247,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -2369,7 +2369,7 @@
   ],
   "functions_over_limit_count": 40,
   "gate_status": "pass",
-  "generated_at": "2026-07-23T04:07:52.712478+00:00",
+  "generated_at": "2026-07-23T04:19:04.323608+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -4677,7 +4677,7 @@
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 79,
+      "line_count": 88,
       "module": "crypto_rsi_scanner.lean_radar.dashboard",
       "owner_note": "",
       "public": true,
@@ -5154,7 +5154,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "load_dashboard_state",
-      "line_count": 151,
+      "line_count": 168,
       "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
       "public": true,
       "qualname": "load_dashboard_state",
@@ -5165,7 +5165,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "refresh_system_health",
-      "line_count": 193,
+      "line_count": 200,
       "module": "crypto_rsi_scanner.lean_radar.health",
       "public": true,
       "qualname": "refresh_system_health",
@@ -5176,7 +5176,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "run_scan",
-      "line_count": 246,
+      "line_count": 247,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -5217,7 +5217,7 @@
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 79,
+      "line_count": 88,
       "module": "crypto_rsi_scanner.lean_radar.dashboard",
       "owner_note": "",
       "public": true,
@@ -5892,7 +5892,7 @@
     },
     {
       "function_name": "load_dashboard_state",
-      "line_count": 151,
+      "line_count": 168,
       "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
       "public": true,
       "qualname": "load_dashboard_state",
@@ -5900,7 +5900,7 @@
     },
     {
       "function_name": "refresh_system_health",
-      "line_count": 193,
+      "line_count": 200,
       "module": "crypto_rsi_scanner.lean_radar.health",
       "public": true,
       "qualname": "refresh_system_health",
@@ -5908,7 +5908,7 @@
     },
     {
       "function_name": "run_scan",
-      "line_count": 246,
+      "line_count": 247,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -6053,7 +6053,7 @@
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 79,
+      "line_count": 88,
       "module": "crypto_rsi_scanner.lean_radar.dashboard",
       "owner_note": "",
       "public": true,
@@ -6925,7 +6925,7 @@
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 79,
+      "line_count": 88,
       "module": "crypto_rsi_scanner.lean_radar.dashboard",
       "owner_note": "",
       "public": true,
@@ -7453,7 +7453,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "load_dashboard_state",
-      "line_count": 151,
+      "line_count": 168,
       "module": "crypto_rsi_scanner.lean_radar.dashboard_data",
       "public": true,
       "qualname": "load_dashboard_state",
@@ -7464,7 +7464,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "refresh_system_health",
-      "line_count": 193,
+      "line_count": 200,
       "module": "crypto_rsi_scanner.lean_radar.health",
       "public": true,
       "qualname": "refresh_system_health",
@@ -7475,7 +7475,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "run_scan",
-      "line_count": 246,
+      "line_count": 247,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",

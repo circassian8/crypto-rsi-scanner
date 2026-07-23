@@ -9,6 +9,7 @@ import re
 import sqlite3
 from typing import Mapping
 
+from .freshness import market_scan_freshness
 from .models import CalendarEvent, LeanIdea, LeanOutcome, MarketSnapshot
 from .store import SCHEMA_VERSION, LeanRadarStore, LeanRadarStoreError
 
@@ -35,6 +36,8 @@ class _LeanDashboardState:
     catalog_source_mode: str
     catalog_observed_at: str | None
     watchlist_count: int
+    market_idea_freshness: str
+    suppressed_active_idea_count: int
     active_ideas: tuple[LeanIdea, ...]
     recent_ideas: tuple[LeanIdea, ...]
     latest_snapshots: tuple[MarketSnapshot, ...]
@@ -173,7 +176,9 @@ def load_dashboard_state(
         recent_ideas.append(idea)
         if int(row["active"]) == 1:
             active_ids.add(idea.idea_id)
-    active_ideas = tuple(row for row in recent_ideas if row.idea_id in active_ids)
+    stored_active_ideas = tuple(
+        row for row in recent_ideas if row.idea_id in active_ids
+    )
     snapshots = tuple(
         _snapshot(_object(row["payload_json"], "market snapshot"))
         for row in snapshot_rows
@@ -191,6 +196,19 @@ def load_dashboard_state(
         if not isinstance(component, str) or not component:
             raise LeanDashboardDataError("stored health component is invalid")
         health[component] = _object(row["payload_json"], "health")
+    try:
+        market_freshness, _ = market_scan_freshness(
+            health.get("scan", {}),
+            evaluated_at=now,
+        )
+    except ValueError as exc:
+        raise LeanDashboardDataError("stored scan freshness is invalid") from exc
+    if market_freshness == "current":
+        active_ideas = stored_active_ideas
+        suppressed_active_idea_count = 0
+    else:
+        active_ideas = ()
+        suppressed_active_idea_count = len(stored_active_ideas)
     truncated: list[str] = []
     if idea_count > MAX_IDEAS:
         truncated.append("ideas")
@@ -206,6 +224,8 @@ def load_dashboard_state(
         catalog_source_mode=metadata.get("bybit_catalog_source_mode", "unavailable"),
         catalog_observed_at=metadata.get("bybit_catalog_source_observed_at"),
         watchlist_count=watchlist_count,
+        market_idea_freshness=market_freshness,
+        suppressed_active_idea_count=suppressed_active_idea_count,
         active_ideas=active_ideas,
         recent_ideas=tuple(recent_ideas),
         latest_snapshots=snapshots,

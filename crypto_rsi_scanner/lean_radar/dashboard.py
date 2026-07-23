@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime
 import json
 from pathlib import Path
 from socketserver import ThreadingMixIn
@@ -36,8 +37,14 @@ class _DashboardHttpResponse:
 class LeanRadarDashboardApp:
     """GET/HEAD-only WSGI application with no provider or write path."""
 
-    def __init__(self, store: LeanRadarStore) -> None:
+    def __init__(
+        self,
+        store: LeanRadarStore,
+        *,
+        evaluated_at: datetime | None = None,
+    ) -> None:
         self.store = store
+        self.evaluated_at = evaluated_at
 
     def response(
         self,
@@ -55,7 +62,10 @@ class LeanRadarDashboardApp:
                 head=method == "HEAD",
             )
         try:
-            state = load_dashboard_state(self.store)
+            state = load_dashboard_state(
+                self.store,
+                evaluated_at=self.evaluated_at,
+            )
             detail = None
             clean_path = path if path.startswith("/") else "/"
             if clean_path.startswith("/ideas/"):
@@ -185,6 +195,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = {
             "status": "ready",
             "active_idea_count": len(state.active_ideas),
+            "suppressed_active_idea_count": state.suppressed_active_idea_count,
+            "market_idea_freshness": state.market_idea_freshness,
             "market_count": len(state.latest_snapshots),
             "calendar_event_count": len(state.calendar_events),
             "outcome_count": len(state.outcomes),

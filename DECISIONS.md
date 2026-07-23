@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Require current scan truth before showing current Lean ideas
+**Status:** accepted
+**Decision:** A Lean market idea is current only when the latest persisted scan
+completed successfully, has a valid aware observation clock, records a valid
+15–30-minute cadence, and is no older than two cadences. A later failed or
+invalid scan and an aged successful scan preserve prior ideas, observations,
+outcomes, and details as history but suppress those ideas from current dashboard
+lists and Telegram planning. Scheduled calendar context remains independently
+visible and cannot create market direction.
+**Why:** Retaining the last good evidence is important for audit and outcomes,
+but a storage-level active flag cannot overrule a newer failed attempt or stale
+clock on operator surfaces. One shared rule prevents dashboard and Telegram
+from disagreeing.
+**Revisit when:** A separately designed publication/authority model replaces
+the single-runtime freshness boundary. It must remain at least as fail-closed
+and must not delete historical evidence to make a failed scan look clean.
+
 ## 2026-07-23 - Consume Lean notification state only after delivery
 **Status:** accepted
 **Decision:** Telegram is a presentation of persisted canonical Lean ideas, not

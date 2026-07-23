@@ -23,7 +23,7 @@ from crypto_rsi_scanner.lean_radar.telegram import (
 )
 
 
-NOW = SMOKE_NOW + timedelta(minutes=5)
+NOW = SMOKE_NOW + timedelta(hours=1, minutes=5)
 
 
 def _store(tmp_path: Path) -> LeanRadarStore:
@@ -50,6 +50,25 @@ def _replace_idea(store: LeanRadarStore, idea_id: str, **changes: object) -> Non
             (
                 json.dumps(payload, sort_keys=True, separators=(",", ":")),
                 idea_id,
+            ),
+        )
+        connection.commit()
+
+
+def _replace_scan(store: LeanRadarStore, **changes: object) -> None:
+    with store.connect(write=True) as connection:
+        row = connection.execute(
+            "SELECT payload_json FROM system_health WHERE component = 'scan'"
+        ).fetchone()
+        payload = json.loads(row["payload_json"])
+        payload.update(changes)
+        connection.execute(
+            "UPDATE system_health SET checked_at = ?, status = ?, payload_json = ? "
+            "WHERE component = 'scan'",
+            (
+                payload["checked_at"],
+                payload["status"],
+                json.dumps(payload, sort_keys=True, separators=(",", ":")),
             ),
         )
         connection.commit()
@@ -148,6 +167,48 @@ def test_missing_runtime_preview_is_safe_and_does_not_create_database(
 
 
 @pytest.mark.parametrize(
+    ("changes", "expected_freshness"),
+    (
+        (
+            {
+                "status": "provider_failed",
+                "checked_at": NOW.isoformat(),
+                "observed_at": None,
+            },
+            "incomplete",
+        ),
+        (
+            {
+                "status": "complete",
+                "checked_at": NOW.isoformat(),
+                "observed_at": (NOW - timedelta(minutes=41)).isoformat(),
+            },
+            "stale",
+        ),
+    ),
+)
+def test_stale_or_incomplete_scan_suppresses_ideas_but_keeps_calendar_context(
+    tmp_path: Path,
+    changes: dict[str, object],
+    expected_freshness: str,
+) -> None:
+    store = _store(tmp_path)
+    _replace_scan(store, **changes)
+
+    plan = build_telegram_plan(store, evaluated_at=NOW)
+    body = "\n".join(message["body"] for message in plan["messages"])
+
+    assert plan["market_idea_freshness"] == expected_freshness
+    assert plan["active_idea_count"] == 4
+    assert plan["eligible_idea_count"] == 3
+    assert plan["due_item_count"] == 2
+    assert plan["suppression_reasons"]["stale_or_incomplete_scan"] == 3
+    assert "SOL · Rapid market anomaly" not in body
+    assert "Federal Reserve rate decision" in body
+    assert "Context only · creates no market direction" in body
+
+
+@pytest.mark.parametrize(
     "url",
     (
         "https://user:password@example.com",
@@ -218,6 +279,12 @@ def test_unchanged_family_is_suppressed_until_material_change_or_cooldown(
 
     store.record_notification_deliveries(
         urgent["state_updates"], delivered_at=NOW + timedelta(minutes=20)
+    )
+    _replace_scan(
+        store,
+        checked_at=(NOW + timedelta(minutes=141)).isoformat(),
+        observed_at=(NOW + timedelta(minutes=140)).isoformat(),
+        next_scan_at=(NOW + timedelta(minutes=160)).isoformat(),
     )
     cooldown = build_telegram_plan(
         store,

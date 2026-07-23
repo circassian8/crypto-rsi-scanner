@@ -357,6 +357,7 @@ def test_end_to_end_scan_is_transactional_research_only_and_no_send(
     )
 
     assert result["status"] == "complete"
+    assert result["cadence_minutes"] == 20
     assert result["snapshot_count"] == 5
     rapid = next(
         idea for idea in result["ideas"] if idea["canonical_asset_id"] == "solana"

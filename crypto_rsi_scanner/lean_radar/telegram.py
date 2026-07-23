@@ -11,6 +11,7 @@ import os
 from typing import Callable, Mapping, Sequence
 from urllib.parse import quote, urlsplit
 
+from .freshness import market_scan_freshness
 from .models import CalendarEvent, LeanIdea
 from .safety import SAFETY_COUNTERS
 from .store import LeanRadarStore, LeanRadarStoreError
@@ -119,6 +120,10 @@ def build_telegram_plan(
         raise LeanTelegramError("Lean Radar notification state is unavailable") from exc
 
     ideas = tuple(_idea(row) for row in raw_ideas)
+    try:
+        market_freshness, _ = market_scan_freshness(scan, evaluated_at=now)
+    except ValueError as exc:
+        raise LeanTelegramError("Lean Radar scan freshness is unavailable") from exc
     due: list[_DueItem] = []
     suppression: dict[str, int] = {}
     eligible_ideas = 0
@@ -135,6 +140,9 @@ def build_telegram_plan(
             _count(suppression, "dashboard_only")
             continue
         eligible_ideas += 1
+        if market_freshness != "current":
+            _count(suppression, "stale_or_incomplete_scan")
+            continue
         item, reason = _idea_due(idea, message_type, states, now)
         if item is None:
             _count(suppression, reason)
@@ -184,6 +192,7 @@ def build_telegram_plan(
         "status": "ready" if messages else "ready_empty",
         "evaluated_at": now.isoformat(),
         "source_mode": scan.get("source_mode", "unavailable"),
+        "market_idea_freshness": market_freshness,
         "active_idea_count": len(ideas),
         "eligible_idea_count": eligible_ideas,
         "upcoming_calendar_event_count": len(calendar),
@@ -900,6 +909,7 @@ def _empty_plan(
         "evaluated_at": now.isoformat(),
         "reason": reason,
         "source_mode": "unavailable",
+        "market_idea_freshness": "unavailable",
         "active_idea_count": 0,
         "eligible_idea_count": 0,
         "upcoming_calendar_event_count": 0,

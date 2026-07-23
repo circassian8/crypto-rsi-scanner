@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Mapping
 
 from .config import LeanRadarSettings
+from .freshness import market_scan_freshness
 from .market_data import LIVE_AUTH_ENV, live_provider_authorized
 from .safety import SAFETY_COUNTERS
 from .store import LeanRadarStore, LeanRadarStoreError
@@ -85,18 +86,25 @@ def refresh_system_health(
         errors.append("Telegram state could not be validated")
     last_scan_at = _text_time(scan, "observed_at") if scan else None
     next_scan_at = _text_time(scan, "next_scan_at") if scan else None
-    freshness, age_seconds = _freshness(
-        last_scan_at,
-        now=now,
-        cadence_minutes=settings.cadence_minutes,
-    )
+    if scan is None:
+        freshness, age_seconds = "unavailable", None
+    else:
+        try:
+            scan_freshness, age_seconds = market_scan_freshness(
+                scan,
+                evaluated_at=now,
+                default_cadence_minutes=settings.cadence_minutes,
+            )
+        except ValueError as exc:
+            raise LeanRadarStoreError("stored scan freshness is invalid") from exc
+        freshness = "fresh" if scan_freshness == "current" else scan_freshness
     if catalog.get("status") != "ready":
         errors.append("Confirmed Bybit USDT-perpetual catalog is not ready")
     if scan is None:
         errors.append("No completed or attempted Lean Radar scan is recorded")
     elif scan.get("status") not in {"complete", "ready"}:
         errors.append("The latest scan did not complete")
-    if freshness in {"stale", "future_invalid"}:
+    if freshness in {"stale", "future_invalid", "invalid_cadence"}:
         errors.append("Market observations are not current")
     if not authorized:
         errors.append(f"Current provider authorization is absent ({LIVE_AUTH_ENV})")
@@ -245,23 +253,6 @@ def _next_safe_command(
     if not cadence_eligible:
         return "run make lean-radar-health after the displayed next-scan time"
     return "make lean-radar-scan"
-
-
-def _freshness(
-    observed_at: str | None,
-    *,
-    now: datetime,
-    cadence_minutes: int,
-) -> tuple[str, float | None]:
-    if observed_at is None:
-        return "unavailable", None
-    observed = _time(observed_at)
-    age = (now - observed).total_seconds()
-    if age < -60:
-        return "future_invalid", age
-    if age <= cadence_minutes * 120:
-        return "fresh", max(0.0, age)
-    return "stale", age
 
 
 def _text_time(payload: Mapping[str, object], key: str) -> str | None:

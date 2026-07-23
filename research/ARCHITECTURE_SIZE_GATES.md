@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-23T04:07:52.712478+00:00`
+- generated_at: `2026-07-23T04:19:04.323608+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -75,7 +75,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_observation_campaign.py` | 2327 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_shadow_surprise.py` | 1980 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_surfaces.py` | 1984 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/dashboard.py:LeanRadarDashboardApp` | 79 |
+| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/dashboard.py:LeanRadarDashboardApp` | 88 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:MarketSnapshot` | 78 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:LeanIdea` | 104 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:LeanOutcome` | 123 |
@@ -116,9 +116,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_hypothesis_latest_score_components` | 153 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row` | 160 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/cli.py:run` | 203 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/dashboard_data.py:load_dashboard_state` | 151 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/health.py:refresh_system_health` | 193 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/scan.py:run_scan` | 246 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/dashboard_data.py:load_dashboard_state` | 168 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/health.py:refresh_system_health` | 200 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/scan.py:run_scan` | 247 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/universe.py:build_universe` | 181 |
 
 ## Architecture Gates

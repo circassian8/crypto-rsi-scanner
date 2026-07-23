@@ -139,6 +139,13 @@ closed with one safe local health command. The server is concurrent and
 loopback-only on `127.0.0.1:8766` during coexistence with the legacy dashboard;
 phone/public access is not enabled by this slice.
 
+Current idea cards additionally require the latest scan to be complete, have a
+valid aware observation clock and 15–30-minute cadence, and be no older than two
+cadences. A later failed/incomplete scan or an aged successful scan leaves the
+prior rows intact for market history, idea details, and outcomes, but hides them
+from Today and Ideas and labels the retained evidence historical. Calendar
+context remains visible because it is independently timed and never directional.
+
 ## Implemented Telegram contract
 
 Telegram is a concise projection of the same persisted Lean ideas; it does not
@@ -149,6 +156,10 @@ now, main risk, confirmation, invalidation, dashboard detail link, and the
 research-only human-decision disclaimer. Fade candidates always say fade or
 exhaustion review and never give an execution instruction. Upcoming calendar
 events are included as context-only risk and create no direction.
+
+The same completed-scan/two-cadence rule used by the dashboard applies before
+Telegram dedupe or grouping. Non-current market ideas cannot become messages;
+upcoming calendar context remains independently eligible.
 
 `lean-radar-telegram-preview` is read-only, writes no dedupe state, calls no
 provider, and sends nothing. `lean-radar-telegram-readiness` exposes only

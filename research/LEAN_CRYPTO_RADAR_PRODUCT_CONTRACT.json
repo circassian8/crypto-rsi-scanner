@@ -143,6 +143,8 @@
       "browser_environment_authorization_inspection": false,
       "provider_calls": false,
       "telegram_sends": false,
+      "current_ideas_require_fresh_complete_scan": true,
+      "stale_or_incomplete_scan_behavior": "hide_current_ideas_preserve_history",
       "default_host": "127.0.0.1",
       "default_port": 8766,
       "provenance_badges": [
@@ -159,6 +161,8 @@
         "risk_calendar"
       ],
       "projection_of_canonical_ideas": true,
+      "current_ideas_require_fresh_complete_scan": true,
+      "calendar_context_remains_independently_eligible": true,
       "preview_read_only": true,
       "preview_provider_calls": false,
       "preview_database_writes": false,

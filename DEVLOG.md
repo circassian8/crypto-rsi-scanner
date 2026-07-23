@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Hide Lean ideas when the latest scan is not current · Codex
+**Why:** A failed provider attempt intentionally preserves the prior successful
+ideas for audit/history, but those rows must never remain operator-visible as
+current after the latest scan fails or ages beyond the freshness window.
+**Changes:**
+- Added one shared, fail-closed scan-freshness rule bound to a completed scan,
+  aware observation clock, and the persisted 15–30-minute cadence. Successful
+  and failed scan health now records cadence explicitly; legacy fixture rows
+  retain the documented 20-minute default.
+- Dashboard loading now separates stored history from current ideas. A failed,
+  invalid, future-dated, or older-than-two-cadence scan suppresses all active
+  idea cards, changes the visible health state to attention, and labels retained
+  market/detail evidence as historical. Calendar context remains visible.
+- Telegram applies the same rule before dedupe/grouping. Non-current market
+  ideas cannot become due messages, while genuine scheduled-risk context stays
+  independently eligible and never creates direction.
+- Added deterministic dashboard clocks and regressions for both incomplete and
+  41-minute-old scans across dashboard, Telegram, scan-health, history, and
+  calendar behavior. Updated the product contract, roadmap, and durable policy.
+**Verify:** All 75 Lean Radar tests pass with external pytest plugins disabled;
+the focused scan/dashboard/Telegram/health subset passes 50 tests. Python
+compileall, product-contract JSON validation, the six-page dashboard smoke,
+architecture cleanliness (all non-size gates clean; size findings advisory),
+and `git diff --check` pass.
+**Notes/risks:** Stored ideas and observations are not deleted or rewritten;
+they remain available for outcomes and historical review. No provider call,
+Telegram send, trade, order, paper trade, RSI write, or `TRIGGERED_FADE`
+occurred.
+
 ## 2026-07-23 — Add first-class guarded Lean Telegram routing · Codex
 **Why:** The dashboard gives depth, but the product also needs a concise
 attention surface that cannot drift from canonical ideas, spam unchanged moves,

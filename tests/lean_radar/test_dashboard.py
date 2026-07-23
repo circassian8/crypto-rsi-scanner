@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,7 @@ from crypto_rsi_scanner.lean_radar.dashboard_data import (
     load_dashboard_state,
 )
 from crypto_rsi_scanner.lean_radar.dashboard_smoke import (
+    SMOKE_NOW,
     build_preview_database,
     run_dashboard_smoke,
 )
@@ -21,10 +24,34 @@ from crypto_rsi_scanner.lean_radar.store import LeanRadarStore
 
 
 PRIMARY_PATHS = ("/", "/ideas", "/market", "/calendar", "/outcomes", "/health")
+NOW = SMOKE_NOW + timedelta(hours=1, minutes=5)
 
 
 def _store(tmp_path: Path) -> LeanRadarStore:
     return LeanRadarStore(build_preview_database(tmp_path / "lean.db"))
+
+
+def _app(store: LeanRadarStore) -> LeanRadarDashboardApp:
+    return LeanRadarDashboardApp(store, evaluated_at=NOW)
+
+
+def _replace_scan(store: LeanRadarStore, **changes: object) -> None:
+    with store.connect(write=True) as connection:
+        row = connection.execute(
+            "SELECT payload_json FROM system_health WHERE component = 'scan'"
+        ).fetchone()
+        payload = json.loads(row["payload_json"])
+        payload.update(changes)
+        connection.execute(
+            "UPDATE system_health SET checked_at = ?, status = ?, payload_json = ? "
+            "WHERE component = 'scan'",
+            (
+                payload["checked_at"],
+                payload["status"],
+                json.dumps(payload, sort_keys=True, separators=(",", ":")),
+            ),
+        )
+        connection.commit()
 
 
 def test_dashboard_smoke_renders_exactly_six_primary_pages() -> None:
@@ -39,7 +66,7 @@ def test_dashboard_smoke_renders_exactly_six_primary_pages() -> None:
 
 
 def test_every_primary_page_is_human_readable_and_responsive(tmp_path: Path) -> None:
-    app = LeanRadarDashboardApp(_store(tmp_path))
+    app = _app(_store(tmp_path))
 
     for path in PRIMARY_PATHS:
         response = app.response(method="GET", path=path)
@@ -58,7 +85,7 @@ def test_every_primary_page_is_human_readable_and_responsive(tmp_path: Path) -> 
 def test_today_surfaces_near_term_calendar_context_without_direction(
     tmp_path: Path,
 ) -> None:
-    body = LeanRadarDashboardApp(_store(tmp_path)).response(
+    body = _app(_store(tmp_path)).response(
         method="GET",
         path="/",
     ).body.decode("utf-8")
@@ -70,7 +97,7 @@ def test_today_surfaces_near_term_calendar_context_without_direction(
 
 
 def test_ideas_filters_and_detail_use_operator_language(tmp_path: Path) -> None:
-    app = LeanRadarDashboardApp(_store(tmp_path))
+    app = _app(_store(tmp_path))
 
     filtered = app.response(
         method="GET",
@@ -98,7 +125,7 @@ def test_get_and_head_are_read_only_and_other_methods_are_rejected(
     tmp_path: Path,
 ) -> None:
     store = _store(tmp_path)
-    app = LeanRadarDashboardApp(store)
+    app = _app(store)
     before = hashlib.sha256(store.path.read_bytes()).hexdigest()
 
     get = app.response(method="GET", path="/health")
@@ -116,7 +143,7 @@ def test_get_and_head_are_read_only_and_other_methods_are_rejected(
 
 def test_missing_or_invalid_runtime_fails_closed_without_creation(tmp_path: Path) -> None:
     missing = LeanRadarStore(tmp_path / "missing.db")
-    missing_response = LeanRadarDashboardApp(missing).response(method="GET", path="/")
+    missing_response = _app(missing).response(method="GET", path="/")
 
     assert missing_response.status_code == 503
     assert b"Dashboard unavailable" in missing_response.body
@@ -131,15 +158,17 @@ def test_missing_or_invalid_runtime_fails_closed_without_creation(tmp_path: Path
             """
         )
         connection.commit()
-    invalid = LeanRadarDashboardApp(store).response(method="GET", path="/")
+    invalid = _app(store).response(method="GET", path="/")
     assert invalid.status_code == 503
     assert b"Runtime state is not ready" in invalid.body
 
 
 def test_dashboard_loader_returns_closed_bounded_runtime_truth(tmp_path: Path) -> None:
-    state = load_dashboard_state(_store(tmp_path))
+    state = load_dashboard_state(_store(tmp_path), evaluated_at=NOW)
 
     assert state.catalog_count == 5
+    assert state.market_idea_freshness == "current"
+    assert state.suppressed_active_idea_count == 0
     assert len(state.active_ideas) == 4
     assert len(state.latest_snapshots) == 5
     assert len(state.calendar_events) == 2
@@ -153,7 +182,7 @@ def test_dashboard_loader_returns_closed_bounded_runtime_truth(tmp_path: Path) -
 def test_system_health_surfaces_telegram_preview_without_claiming_delivery(
     tmp_path: Path,
 ) -> None:
-    body = LeanRadarDashboardApp(_store(tmp_path)).response(
+    body = _app(_store(tmp_path)).response(
         method="GET",
         path="/health",
     ).body.decode("utf-8")
@@ -162,6 +191,57 @@ def test_system_health_surfaces_telegram_preview_without_claiming_delivery(
     assert "Preview only" in body
     assert "preview messages · no send on page load" in body
     assert "Telegram sends</span>" in body
+
+
+@pytest.mark.parametrize(
+    ("changes", "expected_freshness"),
+    (
+        (
+            {
+                "status": "provider_failed",
+                "checked_at": NOW.isoformat(),
+                "observed_at": None,
+            },
+            "incomplete",
+        ),
+        (
+            {
+                "status": "complete",
+                "checked_at": NOW.isoformat(),
+                "observed_at": (NOW - timedelta(minutes=41)).isoformat(),
+            },
+            "stale",
+        ),
+    ),
+)
+def test_stale_or_incomplete_scan_hides_current_ideas_but_keeps_history(
+    tmp_path: Path,
+    changes: dict[str, object],
+    expected_freshness: str,
+) -> None:
+    store = _store(tmp_path)
+    _replace_scan(store, **changes)
+
+    state = load_dashboard_state(store, evaluated_at=NOW)
+    app = _app(store)
+    today = app.response(method="GET", path="/").body.decode("utf-8")
+    ideas = app.response(method="GET", path="/ideas").body.decode("utf-8")
+    market = app.response(method="GET", path="/market").body.decode("utf-8")
+    detail = app.response(
+        method="GET", path="/ideas/lean-sol-rapid-review"
+    ).body.decode("utf-8")
+
+    assert state.market_idea_freshness == expected_freshness
+    assert state.suppressed_active_idea_count == 4
+    assert state.active_ideas == ()
+    assert len(state.recent_ideas) == 4
+    assert "4 stored ideas are hidden" in today
+    assert "Rapid market anomaly" not in today
+    assert "0 current ideas" in ideas
+    assert "SOLUSDT" in market
+    assert "Historical market snapshot" in market
+    assert "Historical idea" in detail
+    assert "not a current operator action" in detail
 
 
 def test_dashboard_server_refuses_non_loopback_binding(tmp_path: Path) -> None:

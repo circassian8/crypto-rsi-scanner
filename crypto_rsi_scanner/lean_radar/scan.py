@@ -267,6 +267,7 @@ def run_scan(
         "checked_at": now.astimezone(timezone.utc).isoformat(),
         "observed_at": market_observed_at.isoformat(),
         "next_scan_at": next_scan.isoformat(),
+        "cadence_minutes": settings.cadence_minutes,
         "source_mode": source_mode,
         "provider_call_attempted": provider_call_attempted,
         "provider_call_succeeded": provider_call_succeeded,
@@ -357,6 +358,7 @@ def _failed_provider_health(
             attempted_at.astimezone(timezone.utc)
             + timedelta(minutes=settings.cadence_minutes)
         ).isoformat(),
+        "cadence_minutes": settings.cadence_minutes,
         "source_mode": "live_no_send",
         "reason": reason,
         "provider_call_attempted": True,

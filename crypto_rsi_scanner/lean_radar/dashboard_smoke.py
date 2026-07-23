@@ -24,7 +24,10 @@ def run_dashboard_smoke() -> dict[str, object]:
         store = LeanRadarStore(Path(directory) / "lean.db")
         _build_smoke_store(store)
         before = _digest(store.path)
-        app = LeanRadarDashboardApp(store)
+        app = LeanRadarDashboardApp(
+            store,
+            evaluated_at=SMOKE_NOW + timedelta(hours=1, minutes=5),
+        )
         primary_paths = ("/", "/ideas", "/market", "/calendar", "/outcomes", "/health")
         responses = {
             path: app.response(method="GET", path=path) for path in primary_paths
@@ -356,6 +359,7 @@ def _scan_health(observed_at: datetime) -> dict[str, object]:
         "checked_at": observed_at.isoformat(),
         "observed_at": observed_at.isoformat(),
         "next_scan_at": (observed_at + timedelta(minutes=20)).isoformat(),
+        "cadence_minutes": 20,
         "source_mode": "fixture",
         "provider_call_attempted": False,
         "provider_call_succeeded": False,
