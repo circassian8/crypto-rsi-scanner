@@ -2369,7 +2369,7 @@
   ],
   "functions_over_limit_count": 40,
   "gate_status": "pass",
-  "generated_at": "2026-07-23T04:27:56.379560+00:00",
+  "generated_at": "2026-07-23T04:46:07.485906+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [

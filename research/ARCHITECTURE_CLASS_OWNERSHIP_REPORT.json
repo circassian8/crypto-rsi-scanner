@@ -1947,7 +1947,7 @@
     }
   ],
   "functions_over_limit_count": 40,
-  "generated_at": "2026-07-23T04:28:00.627895+00:00",
+  "generated_at": "2026-07-23T04:46:11.591787+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],

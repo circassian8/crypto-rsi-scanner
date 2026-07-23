@@ -1,10 +1,10 @@
 # Lean Crypto Radar V1 Product Contract
 
-Status: active product rebuild. The universe/store, market-scan, context-only
-calendar, automatic outcomes, bounded system health, and six-page read-only
-dashboard are implemented. Telegram preview, dedupe, readiness, and explicitly
-guarded delivery are also implemented; default workflow/release closure remains
-in progress.
+Status: implemented default product. The universe/store, market scan,
+context-only calendar, automatic outcomes, bounded system health, six-page
+read-only dashboard, Telegram preview/dedupe/readiness/guarded delivery, shared
+current-scan gate, and explicit no-send operator cycle are implemented and
+release-verified on macOS with Python 3.13.
 
 ## Product
 
@@ -276,6 +276,19 @@ against one disposable fixture database without touching operator state. The
 catalog import and genuine market-snapshot import reject checked-in fixture,
 test, mock, or replay paths. The legacy Decision Radar commands remain
 available for research operations but are outside this default path.
+
+## V1 release evidence
+
+The 2026-07-23 release gate passed all 77 focused Lean Radar tests, the bounded
+artifact-heavy performance guard (14 tests in 0.16 seconds), the export parent-
+symlink/TOCTOU regression, compileall, contract JSON validation, all focused
+operator readiness/smoke commands, and architecture cleanliness. The supported
+Python 3.13 `verify-fast` gate passed 3,992 package tests plus alert/backtest/
+score smokes. The final `make verify` passed 1,547 standalone compatibility
+tests, the same 3,992 package tests, and every release smoke. Dashboard socket
+tests used their required local loopback permission. No live provider call,
+Telegram send, trade, order, paper trade, normal RSI write, or
+Event Alpha-created `TRIGGERED_FADE` occurred during this release work.
 
 ## Deliberately not included
 

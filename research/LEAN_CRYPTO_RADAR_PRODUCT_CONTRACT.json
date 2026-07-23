@@ -1,6 +1,6 @@
 {
   "schema_version": "lean_crypto_radar_product_contract_v1",
-  "status": "active_product_rebuild",
+  "status": "implemented_default_product",
   "product": "Lean Crypto Radar V1",
   "default_operator_product": true,
   "implementation_state": {
@@ -276,6 +276,22 @@
     "provider_calls_require_existing_explicit_authorization": true,
     "application_may_create_or_persist_authorization": false,
     "fabricated_missing_data": false
+  },
+  "release_verification": {
+    "verified_at": "2026-07-23",
+    "platform": "macos",
+    "python": "3.13.5",
+    "focused_lean_tests_passed": 77,
+    "artifact_heavy_performance_tests_passed": 14,
+    "verify_fast_package_tests_passed": 3992,
+    "full_standalone_tests_passed": 1547,
+    "full_package_tests_passed": 3992,
+    "alert_backtest_score_smokes_passed": true,
+    "architecture_clean": true,
+    "export_toctou_regression_passed": true,
+    "live_provider_calls": 0,
+    "telegram_sends": 0,
+    "trades_orders_paper_rsi_or_triggered_fade_created": 0
   },
   "mothballed_from_default_path": [
     "event_alpha_full_pipeline",

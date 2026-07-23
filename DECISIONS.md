@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Accept Lean Crypto Radar V1 as the default product
+**Status:** accepted
+**Decision:** Lean Crypto Radar V1 is implemented and release-verified as the
+default personal operator product. Its default surface is the small SQLite-
+backed Bybit-perpetual path documented in the product contract, README, and
+primary Make help. Keep Event Alpha, the prior Decision Radar, the Empirical
+Lab, and the RSI scanner available as optional research/legacy infrastructure;
+do not route normal Lean operation back through their artifact authority.
+Direct Bybit timestamped bars, spread/depth observations, and later empirical
+calibration are V1 enrichments, not grounds to reopen or weaken the shipped
+missing-data rules.
+**Why:** Every V1 definition-of-done item is implemented and the focused,
+fast, full, security, architecture, performance, and no-side-effect gates pass.
+The new path is materially smaller and gives one operator a coherent status,
+cycle, dashboard, preview, and separately guarded delivery workflow.
+**Revisit when:** Genuine operation identifies a concrete missing capability or
+enough point-in-time outcomes support a frozen prospective calibration. Do not
+reopen the broad architecture merely to add providers or increase idea counts.
+
 ## 2026-07-23 - Make one no-send cycle the normal Lean operating command
 **Status:** accepted
 **Decision:** `make lean-radar` is the read-only default status entrypoint and

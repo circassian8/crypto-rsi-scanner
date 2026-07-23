@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Release Lean Crypto Radar V1 as the default product · Codex
+**Why:** All V1 product slices and the simplified operator workflow were
+implemented; the remaining work was to prove the complete project still passes
+its release/security gates and seal the contract as shipped rather than leave
+it labeled an active rebuild.
+**Changes:**
+- Marked the Markdown/JSON Lean product contract and roadmap complete and
+  recorded the durable release decision. The contract now carries exact macOS
+  Python 3.13 release evidence and keeps direct Bybit bars/execution quality as
+  future honest enrichments rather than V1 blockers.
+- Reconfirmed the real local default state: the new `lean_radar.db` is absent,
+  so readiness safely requests a genuine Bybit catalog import; dashboard smoke
+  remains fully functional from a disposable fixture. Telegram configuration
+  readiness exposed booleans/counts only and made no send.
+- Refreshed the canonical architecture reports after the completed source and
+  documentation changes.
+**Verify:** All 77 focused Lean Radar tests pass. Compileall, product-contract
+JSON validation, Lean readiness/Bybit readiness/dashboard smoke/Telegram
+preview/Telegram readiness/health, the export parent-symlink/TOCTOU regression,
+architecture cleanliness, and the artifact-heavy checkout guard (14 tests in
+0.16 seconds) pass. `make verify-fast` passes 3,992 package tests plus alert,
+backtest, and score smokes. Final `make verify` passes 1,547/1,547 standalone
+tests, 3,992/3,992 package tests, and every smoke. The one initial restricted
+run's loopback bind was denied by the workspace sandbox; its exact test and both
+complete gates pass with local loopback permission.
+**Notes/risks:** No live provider call or real Telegram send was invoked. No
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+was created. A genuine current Bybit catalog still must be imported by the
+operator before the first live Lean cycle.
+
 ## 2026-07-23 — Make the Lean no-send cycle the default workflow · Codex
 **Why:** The completed Lean surfaces still required the operator to remember
 and reconcile separate scan, outcome, health, and preview commands, while the
