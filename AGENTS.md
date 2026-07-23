@@ -196,6 +196,16 @@ require a known catalyst to surface a liquid, timely market-led review item.
   global context; crypto events require an exact affected symbol. They may raise
   risk/urgency or shorten an existing idea's expiry, but must remain
   `context_only=true`, create no direction, and never manufacture an idea.
+- Every Lean idea atomically receives `1h`, `4h`, `24h`, and `3d` outcome
+  placeholders. `make lean-radar-outcomes` may mature them only from retained
+  point-in-time snapshots: first endpoint at/after target within 45 minutes,
+  exact-clock BTC/ETH relatives, and retained-path MFE/MAE for directional
+  review ideas; neutral ideas keep directional excursions unavailable. Missing evidence
+  becomes unresolved, never a current-price backfill or provider call. The
+  descriptive result bands cannot feed detector thresholds, scores, or routes.
+  `make lean-radar-health` persists bounded local operator truth without a
+  provider call or send and keeps current authorization/call eligibility
+  separate from the latest historical provider attempt/result.
 
 The durable product contract is
 `research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md` / `.json`. During the rebuild,

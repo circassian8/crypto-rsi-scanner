@@ -9,6 +9,7 @@ from .models import (
     ROUTES,
     BybitInstrument,
     LeanIdea,
+    LeanOutcome,
     UniverseAsset,
 )
 
@@ -17,5 +18,6 @@ __all__ = (
     "ROUTES",
     "BybitInstrument",
     "LeanIdea",
+    "LeanOutcome",
     "UniverseAsset",
 )

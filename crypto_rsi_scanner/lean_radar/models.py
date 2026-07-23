@@ -29,6 +29,18 @@ ROUTES = (
     "risk_calendar",
     "diagnostic_hidden",
 )
+OUTCOME_HORIZONS = ("1h", "4h", "24h", "3d")
+OUTCOME_STATES = ("pending", "matured", "unresolved")
+OUTCOME_RESULTS = (
+    "pending",
+    "unresolved",
+    "inconclusive",
+    "continued",
+    "reversed",
+    "failed_quickly",
+    "risk_warning_validated",
+)
+IDEA_OUTCOME_STATES = ("pending", "partial", "matured", "unresolved")
 CATALOG_SOURCE_MODES = ("live_no_send", "imported_catalog", "fixture")
 MARKET_SOURCE_MODES = ("live_no_send", "imported_snapshot", "fixture")
 CALENDAR_CATEGORIES = (
@@ -447,6 +459,8 @@ class LeanIdea:
         _require_timestamp(self.expires_at, "expires_at")
         if self.idea_type not in IDEA_TYPES:
             raise LeanRadarModelError("idea_type is invalid")
+        if self.outcome_status not in IDEA_OUTCOME_STATES:
+            raise LeanRadarModelError("outcome_status is invalid")
         if self.dashboard_route not in ROUTES or self.telegram_route not in ROUTES:
             raise LeanRadarModelError("idea route is invalid")
         for label in (
@@ -494,6 +508,132 @@ class LeanIdea:
         return payload
 
 
+@dataclass(frozen=True)
+class LeanOutcome:
+    idea_id: str
+    symbol: str
+    canonical_asset_id: str
+    idea_type: str
+    directional_bias: str
+    horizon: str
+    target_at: str
+    status: str
+    result: str
+    evaluated_at: str
+    start_observed_at: str
+    start_price_usd: float | None
+    end_observed_at: str | None = None
+    end_price_usd: float | None = None
+    endpoint_lag_seconds: float | None = None
+    return_pp: float | None = None
+    relative_btc_pp: float | None = None
+    relative_eth_pp: float | None = None
+    mfe_pp: float | None = None
+    mae_pp: float | None = None
+    path_snapshot_count: int = 0
+    expired: bool = False
+    missing_information: tuple[str, ...] = ()
+    calculation_basis: str = "retained_point_in_time_market_snapshots"
+    schema_version: str = "lean_outcome_v1"
+    research_only: bool = True
+
+    def __post_init__(self) -> None:
+        for label in (
+            "idea_id",
+            "symbol",
+            "canonical_asset_id",
+            "directional_bias",
+            "calculation_basis",
+        ):
+            _require_text(getattr(self, label), label)
+        if self.idea_type not in IDEA_TYPES:
+            raise LeanRadarModelError("outcome idea_type is invalid")
+        if self.horizon not in OUTCOME_HORIZONS:
+            raise LeanRadarModelError("outcome horizon is invalid")
+        if self.status not in OUTCOME_STATES:
+            raise LeanRadarModelError("outcome status is invalid")
+        if self.result not in OUTCOME_RESULTS:
+            raise LeanRadarModelError("outcome result is invalid")
+        if self.schema_version != "lean_outcome_v1":
+            raise LeanRadarModelError("outcome schema_version is invalid")
+        start = _parsed_time(_require_timestamp(self.start_observed_at, "start_observed_at"))
+        target = _parsed_time(_require_timestamp(self.target_at, "target_at"))
+        _require_timestamp(self.evaluated_at, "evaluated_at")
+        if target <= start:
+            raise LeanRadarModelError("outcome target must follow the start")
+        if self.end_observed_at is not None:
+            end = _parsed_time(_require_timestamp(self.end_observed_at, "end_observed_at"))
+            if end < target:
+                raise LeanRadarModelError("outcome endpoint precedes its target")
+        for label in ("start_price_usd", "end_price_usd"):
+            value = getattr(self, label)
+            if value is not None and (not math.isfinite(value) or value <= 0):
+                raise LeanRadarModelError(f"{label} must be positive and finite")
+        for label in (
+            "endpoint_lag_seconds",
+            "return_pp",
+            "relative_btc_pp",
+            "relative_eth_pp",
+            "mfe_pp",
+            "mae_pp",
+        ):
+            value = getattr(self, label)
+            if value is not None and not math.isfinite(value):
+                raise LeanRadarModelError(f"{label} must be finite when present")
+        if self.endpoint_lag_seconds is not None and self.endpoint_lag_seconds < 0:
+            raise LeanRadarModelError("endpoint_lag_seconds is invalid")
+        if self.mfe_pp is not None and self.mfe_pp < 0:
+            raise LeanRadarModelError("mfe_pp must be nonnegative")
+        if self.mae_pp is not None and self.mae_pp > 0:
+            raise LeanRadarModelError("mae_pp must be nonpositive")
+        if (
+            isinstance(self.path_snapshot_count, bool)
+            or not isinstance(self.path_snapshot_count, int)
+            or self.path_snapshot_count < 0
+        ):
+            raise LeanRadarModelError("path_snapshot_count is invalid")
+        if not isinstance(self.expired, bool):
+            raise LeanRadarModelError("expired is invalid")
+        _require_text_items(self.missing_information, "missing_information")
+        if self.research_only is not True:
+            raise LeanRadarModelError("lean outcomes must remain research-only")
+        if self.status == "matured":
+            if (
+                self.end_observed_at is None
+                or self.end_price_usd is None
+                or self.return_pp is None
+                or self.endpoint_lag_seconds is None
+                or self.path_snapshot_count < 2
+                or self.result in {"pending", "unresolved"}
+            ):
+                raise LeanRadarModelError("matured outcome evidence is incomplete")
+        elif any(
+            value is not None
+            for value in (
+                self.end_observed_at,
+                self.end_price_usd,
+                self.endpoint_lag_seconds,
+                self.return_pp,
+                self.relative_btc_pp,
+                self.relative_eth_pp,
+                self.mfe_pp,
+                self.mae_pp,
+            )
+        ):
+            raise LeanRadarModelError("non-matured outcome contains endpoint evidence")
+        if self.status != "matured" and self.path_snapshot_count != 0:
+            raise LeanRadarModelError("non-matured outcome has a path count")
+        if self.status == "pending" and self.result != "pending":
+            raise LeanRadarModelError("pending outcome result is inconsistent")
+        if self.status == "unresolved" and self.result != "unresolved":
+            raise LeanRadarModelError("unresolved outcome result is inconsistent")
+
+    def to_dict(self) -> dict[str, object]:
+        payload = asdict(self)
+        payload["missing_information"] = list(self.missing_information)
+        return payload
+
+
 __all__ = (
     "IDEA_TYPES",
     "ROUTES",
@@ -502,9 +642,14 @@ __all__ = (
     "CALENDAR_IMPORTANCE",
     "CALENDAR_TIME_CERTAINTY",
     "MARKET_SOURCE_MODES",
+    "IDEA_OUTCOME_STATES",
+    "OUTCOME_HORIZONS",
+    "OUTCOME_RESULTS",
+    "OUTCOME_STATES",
     "BybitInstrument",
     "CalendarEvent",
     "LeanIdea",
+    "LeanOutcome",
     "LeanRadarModelError",
     "MarketFeatures",
     "MarketSnapshot",

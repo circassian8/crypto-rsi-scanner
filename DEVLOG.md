@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Add point-in-time Lean outcomes and coherent system health · Codex
+**Why:** The operator needs to know whether a surfaced idea continued, reversed,
+or failed without hindsight-filled prices, and the future dashboard needs one
+truthful health view that does not confuse an old provider success with current
+authorization.
+**Changes:**
+- Added a closed `lean_outcome_v1` value and automatic `1h`, `4h`, `24h`, and
+  `3d` placeholders in the same transaction as each idea and its exact start
+  snapshot. Scan completion also matures any due retained outcomes.
+- Added point-in-time maturation using the first same-asset snapshot at or after
+  the target within 45 minutes. It records asset and exact-clock BTC/ETH-relative
+  return, retained-path MFE/MAE for directional review ideas, expiry, endpoint
+  lag, evidence count, and explicit pending/matured/unresolved state. A late
+  current quote cannot backfill a missed window, and neutral ideas do not invent
+  directional excursions.
+- Added descriptive continued/reversed/failed-quickly/risk-warning-validated
+  results with fixed reporting bands. The outcome path exposes zero automatic
+  threshold changes, requires no human label, and cannot feed setup scores,
+  routes, or detector policy.
+- Extended the existing SQLite store with strict outcome reads/writes, aggregate
+  idea outcome state, and a bounded outcome-health receipt; no execution or
+  portfolio tables were added.
+- Added `lean-radar-outcomes` and `lean-radar-health`. Health persists last/next
+  scan, freshness, Bybit catalog, CoinGecko, calendar, outcome, no-send,
+  Telegram-mode, bounded error, and next-action truth while keeping the last
+  provider attempt/result separate from authorization checked now and current
+  call eligibility. Neither command calls a provider or sends, and a missing
+  database remains absent.
+- Updated the product contract, working agreement, durable decision, roadmap,
+  Make help, and focused model/store/scan/CLI coverage.
+**Verify:** All 46 focused Lean Radar tests pass with external pytest plugins
+disabled. They prove exact 1-hour maturation, BTC/ETH-relative arithmetic,
+path MFE/MAE, neutral-direction honesty, missed-window unresolved behavior even
+when a later price exists, risk-warning validation, atomic scan placeholders,
+safe missing-store Make commands, and current-versus-historical authorization
+truth. Python compileall passes; the product JSON parses; `git diff --check`
+passes; actual `lean-radar-outcomes` and `lean-radar-health` commands returned
+safe setup guidance without creating their missing databases; and architecture
+cleanliness passes every non-size gate with size inventory advisory.
+**Notes/risks:** The result bands are descriptive vocabulary, not calibrated
+edge. Direct timestamped Bybit bars and observed spread/depth remain future
+evidence. Full `verify-fast` was not repeated because the immediately prior
+scan-engine slice passed all 3,944 tests and this isolated follow-up has focused
+store/scan/model/CLI plus architecture coverage. No provider call, send, trade,
+order, paper trade, normal RSI write, or `TRIGGERED_FADE` occurred.
+
 ## 2026-07-23 — Add a context-only Lean calendar overlay · Codex
 **Why:** Scheduled macro and crypto events change timing and risk, but a calendar
 date alone must never manufacture market direction or an idea. Lean Radar needed

@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Keep Lean outcomes point-in-time and policy-ineligible
+**Status:** accepted
+**Decision:** Create `1h`, `4h`, `24h`, and `3d` pending outcomes atomically
+with every Lean idea. Mature a horizon only from the first retained same-asset
+snapshot at or after its target and no more than 45 minutes late. Compute
+BTC/ETH-relative return only from exact matching benchmark clocks and MFE/MAE
+from the retained path for directional review ideas; neutral ideas retain no
+invented direction. Once the target window has passed without that evidence,
+mark the row unresolved instead of using a current price or calling a provider;
+an unresolved row may change only if the exact missing historical snapshot is
+later retained. Use fixed 2-point movement and 3-point one-hour quick-failure
+bands solely for descriptive result labels. Outcomes cannot change detector
+thresholds, scores, routes, or policy, and human labels remain optional.
+
+Persist a bounded operator-health projection separately from scan history. It
+must distinguish the latest provider attempt/result from authorization checked
+now and current call eligibility. Health refresh may inspect local runtime state
+and the existing authorization flag, but makes no provider call or send and
+must not create a missing runtime database.
+**Why:** Point-in-time results are useful only when missing cadence evidence
+stays visibly missing. Separating historical provider truth from current
+permission also prevents a successful old call from implying authority for a
+new one.
+**Revisit when:** Genuine retained observations show that the 45-minute endpoint
+tolerance is operationally inappropriate. Any change must be prospective and
+must not rewrite prior outcome definitions or tune detector policy from a small
+sample.
+
 ## 2026-07-23 - Keep the Lean calendar context-only and local-first
 **Status:** accepted
 **Decision:** Lean Radar calendar readiness makes no provider call or write.

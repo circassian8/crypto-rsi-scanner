@@ -9,7 +9,8 @@
     "dashboard": "pending",
     "telegram_preview": "pending",
     "calendar": "implemented",
-    "outcomes": "pending"
+    "outcomes": "implemented",
+    "system_health": "implemented"
   },
   "venue": "bybit",
   "instrument_type": "usdt_perpetual",
@@ -43,7 +44,7 @@
     "rolling_volume_baseline_minimum_samples": 8,
     "cold_start_attention_proxy": "cross_sectional_turnover_zscore",
     "one_setup_per_asset": true,
-    "atomic_snapshot_idea_health_write": true,
+    "atomic_snapshot_idea_outcome_placeholder_health_write": true,
     "provisional_rules_are_win_probabilities": false
   },
   "calendar": {
@@ -69,6 +70,54 @@
     "may_shorten_existing_idea_expiry": true,
     "may_create_directional_bias": false,
     "may_create_idea_without_market_setup": false
+  },
+  "outcomes": {
+    "horizons": [
+      "1h",
+      "4h",
+      "24h",
+      "3d"
+    ],
+    "source": "retained_point_in_time_market_snapshots",
+    "endpoint_policy": "first_observation_at_or_after_target_within_45_minutes",
+    "missing_endpoint_policy": "pending_then_unresolved_without_backfill",
+    "relative_benchmarks": [
+      "bitcoin",
+      "ethereum"
+    ],
+    "mfe_mae_policy": "directional_review_only_neutral_remains_unavailable",
+    "result_vocabulary": [
+      "continued",
+      "reversed",
+      "failed_quickly",
+      "risk_warning_validated",
+      "inconclusive"
+    ],
+    "descriptive_move_band_percent_points": 2.0,
+    "failed_quickly_1h_band_percent_points": 3.0,
+    "automatic_threshold_changes": false,
+    "human_labels_required": false,
+    "provider_call": false
+  },
+  "system_health": {
+    "persisted_runtime_projection": true,
+    "separates_current_authorization_from_last_provider_result": true,
+    "reports": [
+      "last_scan",
+      "next_scan",
+      "provider_status",
+      "bybit_universe",
+      "coingecko",
+      "data_freshness",
+      "current_authorization",
+      "current_provider_call_eligibility",
+      "no_send",
+      "telegram_mode",
+      "bounded_errors",
+      "next_safe_command"
+    ],
+    "provider_call": false,
+    "telegram_send": false
   },
   "surfaces": {
     "dashboard_priority": "primary_equal",

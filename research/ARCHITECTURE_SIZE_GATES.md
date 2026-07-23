@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-23T02:59:33.608883+00:00`
+- generated_at: `2026-07-23T03:19:01.252933+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -18,20 +18,20 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_1500_lines: `12`
 - production_files_over_2000_lines: `5`
 - production_files_over_3000_lines: `1`
-- production_classes_over_limit: `6`
+- production_classes_over_limit: `7`
 - production_functions_over_limit: `38`
 - test_size_gate_status: `advisory`
 - test_files_over_1500_lines: `9`
-- classes_over_limit_count: `6`
+- classes_over_limit_count: `7`
 - functions_over_limit_count: `38`
 - accepted_class_exceptions_count: `3`
-- remaining_class_ownership_debt_count: `3`
+- remaining_class_ownership_debt_count: `4`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `85`
 - accepted_model_bundles_count: `84`
 - unresolved_multi_class_modules_count: `0`
-- new_violation_count: `62`
+- new_violation_count: `63`
 - moved_existing_violation_count: `0`
 - api_decomposition_gate_status: `advisory`
 - api_files_over_1500_lines: `0`
@@ -76,8 +76,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_shadow_surprise.py` | 1980 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_surfaces.py` | 1984 |
 | `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:MarketSnapshot` | 78 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:LeanIdea` | 102 |
-| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/store.py:LeanRadarStore` | 586 |
+| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:LeanIdea` | 104 |
+| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/models.py:LeanOutcome` | 123 |
+| `class_over_75_lines` | `class:crypto_rsi_scanner/lean_radar/store.py:LeanRadarStore` | 737 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/artifacts/schema/decision_model.py:_validate_closed_projection` | 194 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py:_validate_return_interval_overlap` | 163 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py:_validate_return_feature_consistency` | 183 |
@@ -113,8 +114,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/market_state.py:snapshot_from_market_row` | 175 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_hypothesis_latest_score_components` | 153 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row` | 160 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/cli.py:run` | 178 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/scan.py:run_scan` | 227 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/cli.py:run` | 192 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/scan.py:run_scan` | 246 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/lean_radar/universe.py:build_universe` | 181 |
 
 ## Architecture Gates

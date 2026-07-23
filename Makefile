@@ -115,11 +115,15 @@ LEAN_RADAR_CALENDAR_SNAPSHOT ?=
 LEAN_RADAR_MARKET_ROWS ?=
 LEAN_RADAR_MARKET_MODE ?= live_no_send
 LEAN_RADAR_MARKET_OBSERVED_AT ?=
+LEAN_RADAR_OUTCOMES_EVALUATED_AT ?=
+LEAN_RADAR_HEALTH_EVALUATED_AT ?=
 LEAN_RADAR_WATCHLIST_ASSET_ID ?=
 LEAN_RADAR_WATCHLIST_SYMBOL ?=
 LEAN_RADAR_WATCHLIST_NOTE ?=
 LEAN_RADAR_MARKET_ROWS_ARG = $(if $(strip $(LEAN_RADAR_MARKET_ROWS)),--markets $(abspath $(LEAN_RADAR_MARKET_ROWS)),)
 LEAN_RADAR_MARKET_OBSERVED_AT_ARG = $(if $(strip $(LEAN_RADAR_MARKET_OBSERVED_AT)),--observed-at $(LEAN_RADAR_MARKET_OBSERVED_AT),)
+LEAN_RADAR_OUTCOMES_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_OUTCOMES_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_OUTCOMES_EVALUATED_AT),)
+LEAN_RADAR_HEALTH_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_HEALTH_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_HEALTH_EVALUATED_AT),)
 RADAR_MARKET_NO_SEND_PYTHON = $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
 RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 RADAR_DAILY_OPS_INTERVAL_SECONDS ?= 300
@@ -269,7 +273,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
 .PHONY: radar-unlock-tokenomist-v5-smoke radar-unlock-tokenomist-v5-capture-smoke radar-unlock-tokenomist-v5-readiness
-.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import
+.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health
 
 help:
 	@echo "Targets:"
@@ -303,6 +307,8 @@ help:
 	@echo "  make lean-radar-scan  Run one already-authorized CoinGecko no-send scan; use LEAN_RADAR_MARKET_MODE=imported_snapshot with an explicit file and UTC clock for offline import"
 	@echo "  make lean-radar-calendar-readiness  Inspect the local context-only calendar; no provider call/write"
 	@echo "  CONFIRM=1 make lean-radar-calendar-import LEAN_RADAR_CALENDAR_SNAPSHOT=/absolute/path/calendar.json  Import a genuine local calendar snapshot"
+	@echo "  make lean-radar-outcomes  Mature due horizons from retained point-in-time snapshots; no provider call"
+	@echo "  make lean-radar-health  Refresh bounded operator health; no provider call or send"
 	@echo "  CONFIRM=1 make lean-radar-watchlist-add LEAN_RADAR_WATCHLIST_ASSET_ID=... LEAN_RADAR_WATCHLIST_SYMBOL=...  Add one blocked-until-verified watchlist asset"
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
@@ -1421,6 +1427,16 @@ lean-radar-calendar-import:
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
 		--db $(LEAN_RADAR_DB_PATH) calendar-import \
 		--calendar $(abspath $(LEAN_RADAR_CALENDAR_SNAPSHOT)) --confirm
+
+lean-radar-outcomes:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) outcomes $(LEAN_RADAR_OUTCOMES_EVALUATED_AT_ARG)
+
+lean-radar-health:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) health $(LEAN_RADAR_HEALTH_EVALUATED_AT_ARG)
 
 radar-dashboard:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \

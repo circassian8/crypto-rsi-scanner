@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from crypto_rsi_scanner.lean_radar.models import LeanIdea, LeanRadarModelError
+from crypto_rsi_scanner.lean_radar.models import (
+    LeanIdea,
+    LeanOutcome,
+    LeanRadarModelError,
+)
 from crypto_rsi_scanner.lean_radar.store import LeanRadarStore
 
 
@@ -56,6 +60,24 @@ def test_fade_wording_is_review_only() -> None:
         _idea(
             idea_type="exhaustion_or_fade_review",
             directional_bias="short",
+        )
+
+
+def test_outcome_model_rejects_matured_state_without_point_in_time_evidence() -> None:
+    with pytest.raises(LeanRadarModelError, match="evidence is incomplete"):
+        LeanOutcome(
+            idea_id="lean-btc-20260723",
+            symbol="BTC",
+            canonical_asset_id="bitcoin",
+            idea_type="relative_strength_long",
+            directional_bias="long",
+            horizon="1h",
+            target_at="2026-07-23T01:00:00+00:00",
+            status="matured",
+            result="continued",
+            evaluated_at="2026-07-23T01:00:00+00:00",
+            start_observed_at="2026-07-23T00:00:00+00:00",
+            start_price_usd=100.0,
         )
 
 

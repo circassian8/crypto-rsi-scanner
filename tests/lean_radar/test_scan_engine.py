@@ -364,6 +364,9 @@ def test_end_to_end_scan_is_transactional_research_only_and_no_send(
     assert rapid["idea_type"] == "rapid_market_anomaly"
     assert rapid["catalyst_status"] == "unknown"
     assert rapid["dashboard_route"] == rapid["telegram_route"] == "urgent_review"
+    assert result["outcome_placeholder_count"] == result["idea_count"] * 4
+    assert result["outcomes"]["outcome_count"] == result["idea_count"] * 4
+    assert result["outcomes"]["provider_call_attempted"] is False
     assert len(
         store.snapshot_history(
             "solana",

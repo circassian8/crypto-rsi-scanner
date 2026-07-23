@@ -121,3 +121,43 @@ def test_make_readiness_is_no_write_and_names_the_safe_import(tmp_path: Path) ->
     assert "CONFIRM=1 make lean-radar-bybit-universe-import" in completed.stdout
     assert "Research only · no send · no trading" in completed.stdout
     assert not database.exists()
+
+
+def test_make_outcomes_and_health_are_safe_without_runtime_state(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    database = tmp_path / "missing-runtime.db"
+
+    outcomes = subprocess.run(
+        (
+            "make",
+            "lean-radar-outcomes",
+            f"PYTHON={sys.executable}",
+            f"LEAN_RADAR_DB_PATH={database}",
+            "LEAN_RADAR_OUTCOMES_EVALUATED_AT=2026-07-23T12:00:00Z",
+        ),
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    health = subprocess.run(
+        (
+            "make",
+            "lean-radar-health",
+            f"PYTHON={sys.executable}",
+            f"LEAN_RADAR_DB_PATH={database}",
+            "LEAN_RADAR_HEALTH_EVALUATED_AT=2026-07-23T12:00:00Z",
+        ),
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert "Status: setup_required" in outcomes.stdout
+    assert "Status: setup_required" in health.stdout
+    assert "Research only · no send · no trading" in outcomes.stdout
+    assert "Research only · no send · no trading" in health.stdout
+    assert not database.exists()

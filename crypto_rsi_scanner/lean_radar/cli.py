@@ -12,7 +12,9 @@ from typing import Mapping, Sequence
 from .bybit_universe import BybitUniverseError, load_catalog
 from .calendar import LeanCalendarError, load_calendar_snapshot
 from .config import LeanRadarConfigError, load_settings
+from .health import refresh_system_health
 from .market_data import MarketDataError, live_provider_authorized
+from .outcomes import LeanOutcomeError, refresh_outcomes
 from .scan import run_scan, scan_readiness
 from .store import LeanRadarStore, LeanRadarStoreError
 from .universe import LeanUniverseError, build_universe, load_market_rows
@@ -31,6 +33,10 @@ def _parser() -> argparse.ArgumentParser:
     subparsers.add_parser("readiness")
     subparsers.add_parser("bybit-readiness")
     subparsers.add_parser("calendar-readiness")
+    outcomes = subparsers.add_parser("outcomes")
+    outcomes.add_argument("--evaluated-at", type=_time)
+    health = subparsers.add_parser("health")
+    health.add_argument("--evaluated-at", type=_time)
 
     importer = subparsers.add_parser("bybit-import")
     importer.add_argument("--catalog", type=Path, required=True)
@@ -64,6 +70,20 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
     args = _parser().parse_args(argv)
     settings = load_settings()
     store = LeanRadarStore(args.db or settings.db_path)
+    if args.command == "outcomes":
+        payload = refresh_outcomes(store, evaluated_at=args.evaluated_at)
+        payload["next_safe_command"] = (
+            "make lean-radar-health"
+            if payload["status"] != "setup_required"
+            else "make lean-radar-readiness"
+        )
+        return 0, payload
+    if args.command == "health":
+        return 0, refresh_system_health(
+            store,
+            settings,
+            evaluated_at=args.evaluated_at,
+        )
     if args.command == "calendar-readiness":
         calendar = store.calendar_status()
         return 0, {
@@ -263,6 +283,24 @@ def render_summary(payload: Mapping[str, object]) -> str:
         )
     if "calendar_event_count" in payload:
         lines.append(f"Calendar events: {payload['calendar_event_count']}")
+    if "outcome_count" in payload:
+        lines.append(
+            f"Outcomes: {payload.get('matured_count', 0)} matured · "
+            f"{payload.get('pending_count', 0)} pending · "
+            f"{payload.get('unresolved_count', 0)} unresolved"
+        )
+    if "data_freshness" in payload:
+        lines.append(
+            f"Market data: {payload.get('data_freshness', 'unavailable')} · "
+            f"provider eligibility: "
+            f"{payload.get('current_provider_call_eligibility', 'unavailable')}"
+        )
+        lines.append(
+            f"Telegram: {payload.get('telegram_mode', 'disabled_no_send')} · no send"
+        )
+    errors = payload.get("errors")
+    if isinstance(errors, list) and errors:
+        lines.append("Attention: " + "; ".join(str(value) for value in errors[:4]))
     calendar = payload.get("calendar")
     if isinstance(calendar, Mapping):
         lines.append(
@@ -307,11 +345,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             forwarded.extend(("--markets", str(args.markets)))
         if args.observed_at:
             forwarded.extend(("--observed-at", args.observed_at.isoformat()))
+    elif args.command in {"outcomes", "health"} and args.evaluated_at:
+        forwarded.extend(("--evaluated-at", args.evaluated_at.isoformat()))
     try:
         code, payload = run(forwarded)
     except (
         BybitUniverseError,
         LeanCalendarError,
+        LeanOutcomeError,
         LeanRadarConfigError,
         LeanRadarStoreError,
         LeanUniverseError,

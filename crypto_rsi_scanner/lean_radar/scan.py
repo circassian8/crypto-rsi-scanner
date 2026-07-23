@@ -16,22 +16,18 @@ from .market_data import (
     live_provider_authorized,
     normalize_snapshots,
 )
+from .outcomes import (
+    LeanOutcomeError,
+    pending_outcomes_for_scan,
+    refresh_outcomes,
+)
+from .safety import SAFETY_COUNTERS
 from .setups import detect_setup
 from .store import LeanRadarStore, LeanRadarStoreError
 from .universe import build_universe
 
 
 MarketProvider = Callable[[], tuple[Sequence[Mapping[str, object]], Mapping[str, object]]]
-SAFETY_COUNTERS = {
-    "telegram_sends": 0,
-    "trades_created": 0,
-    "orders_created": 0,
-    "paper_trades_created": 0,
-    "normal_rsi_signal_rows_written": 0,
-    "triggered_fade_created": 0,
-}
-
-
 def scan_readiness(
     store: LeanRadarStore,
     settings: LeanRadarSettings,
@@ -296,11 +292,30 @@ def run_scan(
         "research_only": True,
         **SAFETY_COUNTERS,
     }
-    store.record_scan(snapshots, ideas, health)
+    outcome_evaluated_at = max(now.astimezone(timezone.utc), market_observed_at)
+    pending_outcomes = pending_outcomes_for_scan(
+        ideas,
+        snapshots,
+        evaluated_at=outcome_evaluated_at,
+    )
+    health["outcome_placeholder_count"] = len(pending_outcomes)
+    store.record_scan(snapshots, ideas, health, outcomes=pending_outcomes)
+    try:
+        outcome_health = refresh_outcomes(store, evaluated_at=outcome_evaluated_at)
+    except (LeanOutcomeError, LeanRadarStoreError, TypeError, ValueError):
+        outcome_health = {
+            "status": "blocked",
+            "reason": "retained outcome evidence failed validation",
+            "provider_call_attempted": False,
+            "telegram_send_attempted": False,
+            "research_only": True,
+            **SAFETY_COUNTERS,
+        }
     return {
         **health,
         "universe": universe.to_dict(),
         "ideas": [idea.to_dict() for idea in ideas],
+        "outcomes": outcome_health,
     }
 
 

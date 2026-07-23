@@ -1,8 +1,8 @@
 # Lean Crypto Radar V1 Product Contract
 
-Status: active product rebuild. The universe/store and market-scan engine are
-implemented; the context-only calendar overlay is implemented; the dashboard,
-Telegram preview, and outcome slices remain in progress.
+Status: active product rebuild. The universe/store, market-scan, context-only
+calendar, automatic outcomes, and bounded system-health slices are implemented;
+the dashboard and Telegram preview remain in progress.
 
 ## Product
 
@@ -64,7 +64,8 @@ liquidity, spread availability, and chase risk remain separate evidence.
 The detector chooses at most one setup per asset. Stale data, missing minimum
 return context, suspicious low-liquidity pumps, and known extreme spread become
 hidden diagnostics. Valid market-led setups are scored once with the four
-operator scores and persisted atomically with the snapshots and scan health.
+operator scores and persisted atomically with the snapshots, four outcome
+placeholders per idea, and scan health.
 Unknown catalyst remains visible with lower confidence and higher risk. Missing
 spread caps confidence and urgency. The initial rules are transparent V1 screens
 to be evaluated through outcomes; they are not estimated win probabilities and
@@ -85,6 +86,34 @@ can shorten an existing idea's expiry, but it is always marked context-only and
 cannot create directional bias or an idea by itself. Missing or invalid
 calendar context remains a visible health limitation while the market scan
 continues. No live calendar provider is called by the import or readiness path.
+
+## Implemented outcomes and health contract
+
+Every idea receives pending `1h`, `4h`, `24h`, and `3d` outcome rows in the
+same transaction that stores the idea and its exact start snapshot. Outcome
+maturation reads only retained point-in-time prices. The endpoint is the first
+same-asset observation at or after the horizon target and no more than 45
+minutes late. A missing endpoint remains pending until that window closes and
+then becomes unresolved; it is never filled from a current quote or a provider
+request. BTC/ETH-relative return uses exact matching benchmark start and end
+clocks. MFE and MAE use the retained path and the idea's review direction;
+neutral ideas keep those directional fields unavailable instead of inventing a
+side.
+
+The descriptive result vocabulary is `continued`, `reversed`,
+`failed_quickly`, `risk_warning_validated`, and `inconclusive`. The fixed 2
+percentage-point movement band and 3 percentage-point one-hour quick-failure
+band are reporting definitions, not detector tuning or probability claims.
+Outcomes never change setup rules, scores, routes, or thresholds, and human
+labels remain optional.
+
+`lean-radar-health` records a small local operator-health projection for the
+future dashboard. It separates the last provider attempt and result from the
+current authorization check and current call eligibility. It also reports the
+last/next scan, data freshness, Bybit catalog, CoinGecko status, calendar,
+outcomes, no-send state, Telegram mode, bounded errors, and the next safe
+command. The command makes no provider call and no send. A missing runtime
+database produces setup guidance without creating one.
 
 ## Hard gates and soft limitations
 
@@ -132,6 +161,8 @@ make lean-radar-universe \
   PYTHON=.venv/bin/python
 make lean-radar-scan PYTHON=.venv/bin/python
 make lean-radar-calendar-readiness PYTHON=.venv/bin/python
+make lean-radar-outcomes PYTHON=.venv/bin/python
+make lean-radar-health PYTHON=.venv/bin/python
 ```
 
 The live scan command respects the already-present CoinGecko authorization and
@@ -151,7 +182,9 @@ make lean-radar-scan \
   PYTHON=.venv/bin/python
 ```
 
-Readiness is observational and makes no provider call or database write. The
+Readiness is observational and makes no provider call or database write.
+Outcome maturation and health refresh are local SQLite updates that make no
+provider call, send, or model-policy change. The
 catalog import and genuine market-snapshot import reject checked-in fixture,
 test, mock, or replay paths. Until the remaining vertical slices land, the
 legacy Decision Radar commands remain available for research operations.
