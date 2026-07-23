@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import socket
 import subprocess
+import sys
 
 import pytest
 
@@ -742,7 +743,11 @@ def test_checked_in_progress_note_matches_structured_unlock_frontier() -> None:
 
 def test_primary_readiness_target_leads_with_current_progress() -> None:
     completed = subprocess.run(
-        ["make", "radar-research-protocol-v2-readiness", "PYTHON=python3"],
+        [
+            "make",
+            "radar-research-protocol-v2-readiness",
+            f"PYTHON={sys.executable}",
+        ],
         cwd=REPO_ROOT,
         check=True,
         capture_output=True,

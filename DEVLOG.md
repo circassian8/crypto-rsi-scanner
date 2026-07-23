@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Keep the extracted-archive gate on its selected Python · Codex
+**Why:** Exact source-with-artifacts verification found one legacy Protocol-v2
+test that ignored the interpreter selected for the suite and forced a bare
+`python3`. In a clean extracted checkout that resolved to a dependency-free
+Homebrew interpreter, so the subprocess failed on missing NumPy even though the
+archive gate itself correctly used the supported project Python 3.13 runtime.
+**Changes:** The readiness-target test now passes its active `sys.executable`
+through Make. It still exercises the real target and output ordering, but no
+longer depends on cwd-sensitive shell interpreter selection or globally
+installed packages.
+**Verify:** The exact focused test passes from the normal checkout and from a
+clean extracted copy using the supported Python 3.13 virtual environment.
+`git diff --check` passes. The fixed review archive is rebuilt and its bounded
+artifact-heavy guard plus `verify-fast` are rerun after this commit.
+**Notes/risks:** Test-only hermeticity change. No product threshold, route,
+provider, authorization, send, trading, paper, RSI, or artifact semantics
+changed.
+
 ## 2026-07-23 — Release Lean Crypto Radar V1 as the default product · Codex
 **Why:** All V1 product slices and the simplified operator workflow were
 implemented; the remaining work was to prove the complete project still passes
