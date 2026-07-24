@@ -21,7 +21,7 @@ SMOKE_NOW = datetime(2026, 7, 23, 12, 0, tzinfo=timezone.utc)
 
 def run_dashboard_smoke() -> dict[str, object]:
     with TemporaryDirectory(prefix="lean-radar-dashboard-") as directory:
-        store = LeanRadarStore(Path(directory) / "lean.db")
+        store = LeanRadarStore(Path(directory).resolve() / "lean.db")
         _build_smoke_store(store)
         before = _digest(store.path)
         app = LeanRadarDashboardApp(
@@ -60,6 +60,8 @@ def run_dashboard_smoke() -> dict[str, object]:
         required = (
             "Crypto Radar",
             "System Health",
+            "Scheduled maintenance",
+            "Local database",
             "Observed outcomes",
             "Scheduled context, never direction",
             "Rapid market anomaly",
@@ -75,6 +77,8 @@ def run_dashboard_smoke() -> dict[str, object]:
             "responsive_viewport_css": True,
             "raw_internal_values_hidden": True,
             "database_unchanged_by_get_head": True,
+            "maintenance_state_rendered": True,
+            "database_status_rendered": True,
             "provider_call_attempted": False,
             "telegram_send_attempted": False,
             "trades_created": 0,
@@ -210,6 +214,7 @@ def _build_smoke_store(store: LeanRadarStore) -> None:
         LeanRadarSettings(db_path=store.path, cadence_minutes=20),
         environ={"RSI_EVENT_DISCOVERY_UNIVERSE_LIVE": "1"},
         evaluated_at=end_time + timedelta(minutes=5),
+        maintenance_plist_path=store.path.parent / "fixture-service.plist",
     )
 
 

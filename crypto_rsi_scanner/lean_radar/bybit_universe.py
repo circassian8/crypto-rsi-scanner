@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-import hashlib
 import json
-import os
 from pathlib import Path
-import stat
 from typing import Mapping, Sequence
 
 from .models import BybitInstrument
+from .path_security import LeanPathSecurityError, read_regular_bytes
 
 
 MAX_CATALOG_BYTES = 16 * 1024 * 1024
@@ -25,50 +23,24 @@ class BybitUniverseError(ValueError):
 
 def read_json_document(path: Path, *, require_genuine: bool = False) -> tuple[object, str]:
     candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        raise BybitUniverseError("catalog path must be absolute")
-    if require_genuine and any(
-        component.casefold() in _NON_GENUINE_COMPONENTS for component in candidate.parts
-    ):
-        raise BybitUniverseError("fixture/test/mock/replay catalog cannot be imported")
     try:
-        before = candidate.lstat()
-    except OSError as exc:
-        raise BybitUniverseError("catalog file is unavailable") from exc
-    if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
-        raise BybitUniverseError("catalog must be a regular non-symlink file")
-    if before.st_nlink != 1 or before.st_size > MAX_CATALOG_BYTES:
-        raise BybitUniverseError("catalog file violates link or size bounds")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(candidate, flags)
-    try:
-        opened = os.fstat(descriptor)
-        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
-            raise BybitUniverseError("catalog identity changed before read")
-        chunks: list[bytes] = []
-        remaining = MAX_CATALOG_BYTES + 1
-        while remaining > 0:
-            chunk = os.read(descriptor, min(1024 * 1024, remaining))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        payload_bytes = b"".join(chunks)
-        after = os.fstat(descriptor)
-    finally:
-        os.close(descriptor)
-    if len(payload_bytes) > MAX_CATALOG_BYTES:
-        raise BybitUniverseError("catalog file exceeds size bound")
-    if (
-        (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-        != (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
-    ):
-        raise BybitUniverseError("catalog changed during read")
+        secured = read_regular_bytes(
+            candidate,
+            maximum_bytes=MAX_CATALOG_BYTES,
+            rejected_components=(
+                frozenset(_NON_GENUINE_COMPONENTS)
+                if require_genuine
+                else frozenset()
+            ),
+        )
+    except LeanPathSecurityError as exc:
+        raise BybitUniverseError(str(exc)) from exc
+    payload_bytes = secured.data
     try:
         payload = json.loads(payload_bytes, object_pairs_hook=_reject_duplicate_keys)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise BybitUniverseError("catalog is not valid UTF-8 JSON") from exc
-    return payload, hashlib.sha256(payload_bytes).hexdigest()
+    return payload, secured.sha256
 
 
 def normalize_catalog(

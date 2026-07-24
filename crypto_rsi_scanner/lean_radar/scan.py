@@ -37,19 +37,45 @@ def scan_readiness(
     evaluated_at: datetime | None = None,
 ) -> dict[str, object]:
     now = (evaluated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    catalog = store.catalog_status()
+    catalog = store.catalog_status(evaluated_at=now)
     last = store.last_scan_status()
     next_scan = _next_scan_time(last, settings.cadence_minutes)
     cadence_ready = next_scan is None or now >= next_scan
     reasons: list[str] = []
     if catalog.get("status") != "ready":
-        reasons.append("confirmed Bybit USDT-perpetual catalog is missing")
+        if catalog.get("freshness_status") == "stale":
+            reasons.append(
+                "confirmed Bybit USDT-perpetual catalog is stale; "
+                "import a fresh complete snapshot"
+            )
+        elif catalog.get("freshness_status") == "future_invalid":
+            reasons.append(
+                "confirmed Bybit USDT-perpetual catalog has a future-invalid clock"
+            )
+        else:
+            reasons.append(
+                "confirmed Bybit USDT-perpetual catalog is missing or invalid"
+            )
     if source_mode == "live_no_send" and not live_provider_authorized(environ):
         reasons.append("RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 is absent")
     if source_mode != "fixture" and catalog.get("source_mode") == "fixture":
         reasons.append("fixture Bybit catalog cannot support a non-fixture scan")
     if not cadence_ready:
         reasons.append(f"scan cadence is waiting until {next_scan.isoformat()}")
+    if catalog.get("status") != "ready":
+        provider_eligibility = (
+            "catalog_stale"
+            if catalog.get("freshness_status") == "stale"
+            else "catalog_unavailable"
+        )
+    elif source_mode != "fixture" and catalog.get("source_mode") == "fixture":
+        provider_eligibility = "fixture_catalog_blocked"
+    elif source_mode == "live_no_send" and not live_provider_authorized(environ):
+        provider_eligibility = "authorization_absent"
+    elif not cadence_ready:
+        provider_eligibility = "cadence_wait"
+    else:
+        provider_eligibility = "eligible"
     return {
         "status": "ready" if not reasons else "blocked",
         "reasons": reasons,
@@ -59,10 +85,11 @@ def scan_readiness(
         "cadence_eligible": cadence_ready,
         "next_scan_at": next_scan.isoformat() if next_scan else None,
         "live_provider_authorized": live_provider_authorized(environ),
-        "current_provider_call_eligibility": (
-            "eligible"
-            if source_mode != "live_no_send" or live_provider_authorized(environ)
-            else "authorization_absent"
+        "current_provider_call_eligibility": provider_eligibility,
+        "warnings": (
+            ["Bybit catalog refresh is recommended before its hard expiry"]
+            if catalog.get("freshness_status") == "refresh_recommended"
+            else []
         ),
         "provider_call_attempted": False,
         "telegram_send_attempted": False,
@@ -107,7 +134,14 @@ def run_scan(
         provider_attempted_at = now.astimezone(timezone.utc)
         try:
             if provider is None:
-                materialized, telemetry = fetch_live_market_rows(environ=environ)
+                instruments = store.list_bybit_instruments()
+                watchlist = store.list_watchlist()
+                materialized, telemetry = fetch_live_market_rows(
+                    instruments=instruments,
+                    manual_watchlist=watchlist,
+                    environ=environ,
+                    target_count=settings.top_liquid_limit,
+                )
             else:
                 materialized, telemetry = provider()
         except Exception:
@@ -157,6 +191,14 @@ def run_scan(
             instruments,
             store.list_watchlist(),
             limit=settings.top_liquid_limit,
+            ranked_source_exhausted=(
+                telemetry.get("ranked_source_exhausted")
+                if isinstance(telemetry.get("ranked_source_exhausted"), bool)
+                else None
+            ),
+            ranked_page_budget_reached=(
+                telemetry.get("ranked_page_budget_reached") is True
+            ),
         )
     except (TypeError, ValueError) as exc:
         if not provider_call_attempted:
@@ -276,6 +318,7 @@ def run_scan(
         ),
         "provider_telemetry": dict(telemetry),
         "market_row_count": len(materialized),
+        "market_acquisition": dict(telemetry),
         "active_universe_count": len(universe.active_assets),
         "blocked_universe_count": len(universe.blocked_assets),
         "snapshot_count": len(snapshots),

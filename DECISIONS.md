@@ -16,6 +16,66 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-24 - Make the Lean universe exactly eligibility-ranked
+**Status:** accepted
+**Decision:** The ranked Lean universe is the first 200 CoinGecko
+24-hour-volume-ordered assets that pass shared hygiene and have one exact active
+Bybit USDT-linear perpetual. A live scan may read at most four 250-row ranked
+pages, stopping on 200 eligible assets, provider exhaustion, or the page budget.
+Enabled watchlist IDs absent from those pages are additive and may use at most
+two separate 50-ID exact requests; they never alter ranked membership. Persist
+bounded request telemetry and distinguish target completion, exhaustion, and
+budget shortfall. This supersedes the one-CoinGecko-request clause in the
+2026-07-23 no-send-cycle and first-scan decisions, but not their authorization,
+cadence, no-send, or safety boundaries.
+**Why:** Truncating one CoinGecko page before the Bybit intersection does not
+produce the claimed top 200 eligible instruments, and a watchlist cannot be
+reliably additive when its exact ID happens to fall outside that page.
+**Revisit when:** CoinGecko changes the official market endpoint contract or
+measured operation shows that the four-page bound cannot normally reach the
+target. Any change must remain bounded, exact-ID based, and authorization-gated.
+
+## 2026-07-24 - Hold every Lean path to one descriptor-anchored identity
+**Status:** accepted
+**Decision:** Walk every Lean import, runtime, dashboard-startup, and maintenance
+path from the filesystem root with no-follow descriptor-relative operations.
+Reject symlinked parents/leaves, hard links, outside redirection, and
+file/directory/lock replacement. Do not pass the operator database pathname to
+SQLite; deserialize one validated image under a stable descriptor-opened lock
+and atomically republish it through the held parent, creating no WAL/SHM
+pathname. Cap the image at 512 MiB and retain full snapshot detail for 3 days,
+compact snapshots for 14 days, ideas/outcomes for 180 days, old calendar rows
+for 30 days, notification state for 90 days/1,000 families, and 256 cycle
+receipts. Successful scans apply retention; explicit maintenance remains
+dry-run by default and confirmation-gated when mutating.
+**Why:** Leaf-only `lstat`/`O_NOFOLLOW` checks still allow parent replacement and
+cannot bind SQLite sidecar writes to a safe ancestry. The fixed retention
+contract makes the stronger single-image boundary practical for a personal
+20-minute runtime without silently deleting recent empirical evidence.
+**Revisit when:** A supported SQLite VFS can open an already-held file and
+sidecars descriptor-relatively on macOS, or observed database growth approaches
+the cap despite the fixed policy. Do not weaken the race or ancestry gates for
+performance.
+
+## 2026-07-24 - Keep Lean macOS maintenance prepared and explicitly disabled
+**Status:** accepted
+**Decision:** Provide one user LaunchAgent for the existing `scheduled-cycle`
+no-send path, but leave it uninstalled by default. Readiness/status are
+observational. Install/uninstall require `CONFIRM=1`, may mutate only the exact
+owned plist/service, and never embed credentials, authorization flags, or
+Telegram delivery configuration. Every terminal manual or scheduled cycle
+writes one bounded local receipt when the runtime exists; health/dashboard show
+last attempt, last success, skip reason, next scheduled time, catalog expiry,
+and database growth. Scheduled calls remain impossible unless authorization is
+already present in the inherited environment and every normal readiness gate
+passes.
+**Why:** Regular cadence is necessary to warm baselines and keep operator truth
+fresh, but background installation and provider permission are separate human
+decisions. The same cycle path avoids a second scheduler-specific evaluator.
+**Revisit when:** The owner explicitly installs the service or chooses a
+different macOS scheduling mechanism. Never make installation part of bootstrap,
+readiness, dashboard GET/HEAD, or release verification.
+
 ## 2026-07-23 - Accept Lean Crypto Radar V1 as the default product
 **Status:** accepted
 **Decision:** Lean Crypto Radar V1 is implemented and release-verified as the

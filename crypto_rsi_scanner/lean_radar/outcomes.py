@@ -74,7 +74,7 @@ def refresh_outcomes(
     evaluated = _aware_utc(
         evaluated_at or datetime.now(timezone.utc), "outcome evaluation time"
     )
-    if not store.path.exists():
+    if not store.exists():
         return {
             "status": "setup_required",
             "component": "outcomes",

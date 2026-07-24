@@ -1802,11 +1802,25 @@
     },
     {
       "accepted_exception": false,
+      "class_name": "AnchoredPath",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 82,
+      "module": "crypto_rsi_scanner.lean_radar.path_security",
+      "owner_note": "",
+      "public": true,
+      "qualname": "AnchoredPath",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/path_security.py"
+    },
+    {
+      "accepted_exception": false,
       "class_name": "LeanRadarStore",
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 945,
+      "line_count": 1570,
       "module": "crypto_rsi_scanner.lean_radar.store",
       "owner_note": "",
       "public": true,
@@ -1857,7 +1871,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "classes_over_limit_count": 8,
+  "classes_over_limit_count": 9,
   "enforcement_status": "quantitative_limits_advisory_only",
   "existing_violation_count": 3,
   "existing_violations": [
@@ -1913,7 +1927,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1218,
+  "file_count": 1222,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1990,6 +2004,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1976,
+      "path": "crypto_rsi_scanner/lean_radar/store.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1576,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
@@ -2043,7 +2063,7 @@
       "source_kind": "test"
     }
   ],
-  "files_over_limit_count": 21,
+  "files_over_limit_count": 22,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -2328,10 +2348,18 @@
     },
     {
       "function_name": "run",
-      "line_count": 179,
+      "line_count": 223,
       "module": "crypto_rsi_scanner.lean_radar.cli",
       "public": true,
       "qualname": "run",
+      "source_path": "crypto_rsi_scanner/lean_radar/cli.py"
+    },
+    {
+      "function_name": "_run_cycle",
+      "line_count": 158,
+      "module": "crypto_rsi_scanner.lean_radar.cli",
+      "public": false,
+      "qualname": "_run_cycle",
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py"
     },
     {
@@ -2343,16 +2371,40 @@
       "source_path": "crypto_rsi_scanner/lean_radar/dashboard_data.py"
     },
     {
+      "function_name": "_today",
+      "line_count": 170,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_render",
+      "public": false,
+      "qualname": "_today",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_render.py"
+    },
+    {
+      "function_name": "_health",
+      "line_count": 162,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_render",
+      "public": false,
+      "qualname": "_health",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_render.py"
+    },
+    {
       "function_name": "refresh_system_health",
-      "line_count": 200,
+      "line_count": 304,
       "module": "crypto_rsi_scanner.lean_radar.health",
       "public": true,
       "qualname": "refresh_system_health",
       "source_path": "crypto_rsi_scanner/lean_radar/health.py"
     },
     {
+      "function_name": "fetch_live_market_rows",
+      "line_count": 200,
+      "module": "crypto_rsi_scanner.lean_radar.market_data",
+      "public": true,
+      "qualname": "fetch_live_market_rows",
+      "source_path": "crypto_rsi_scanner/lean_radar/market_data.py"
+    },
+    {
       "function_name": "run_scan",
-      "line_count": 247,
+      "line_count": 263,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -2360,16 +2412,16 @@
     },
     {
       "function_name": "build_universe",
-      "line_count": 181,
+      "line_count": 218,
       "module": "crypto_rsi_scanner.lean_radar.universe",
       "public": true,
       "qualname": "build_universe",
       "source_path": "crypto_rsi_scanner/lean_radar/universe.py"
     }
   ],
-  "functions_over_limit_count": 40,
+  "functions_over_limit_count": 44,
   "gate_status": "pass",
-  "generated_at": "2026-07-23T04:46:07.485906+00:00",
+  "generated_at": "2026-07-24T12:42:02.147569+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2407,6 +2459,12 @@
       "limit": 1500,
       "line_count": 1986,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1976,
+      "path": "crypto_rsi_scanner/lean_radar/store.py",
       "source_kind": "production"
     },
     {
@@ -2605,12 +2663,6 @@
       "limit": 1500,
       "line_count": 1261,
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1244,
-      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py",
       "source_kind": "production"
     }
   ],
@@ -4478,8 +4530,8 @@
   ],
   "new_blocking_violation_count": 0,
   "new_blocking_violations": [],
-  "new_measurement_count": 66,
-  "new_violation_count": 66,
+  "new_measurement_count": 72,
+  "new_violation_count": 72,
   "new_violations": [
     {
       "category": "file_over_1500_lines",
@@ -4588,6 +4640,15 @@
       "severity": "advisory",
       "source_kind": "production",
       "violation_id": "file:crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 1976,
+      "path": "crypto_rsi_scanner/lean_radar/store.py",
+      "severity": "advisory",
+      "source_kind": "production",
+      "violation_id": "file:crypto_rsi_scanner/lean_radar/store.py"
     },
     {
       "category": "file_over_1500_lines",
@@ -4741,11 +4802,28 @@
     {
       "accepted_exception": false,
       "category": "class_over_75_lines",
+      "class_name": "AnchoredPath",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 82,
+      "module": "crypto_rsi_scanner.lean_radar.path_security",
+      "owner_note": "",
+      "public": true,
+      "qualname": "AnchoredPath",
+      "revisit_condition": "",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/path_security.py",
+      "violation_id": "class:crypto_rsi_scanner/lean_radar/path_security.py:AnchoredPath"
+    },
+    {
+      "accepted_exception": false,
+      "category": "class_over_75_lines",
       "class_name": "LeanRadarStore",
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 945,
+      "line_count": 1570,
       "module": "crypto_rsi_scanner.lean_radar.store",
       "owner_note": "",
       "public": true,
@@ -5143,13 +5221,24 @@
     {
       "category": "function_over_150_lines",
       "function_name": "run",
-      "line_count": 179,
+      "line_count": 223,
       "module": "crypto_rsi_scanner.lean_radar.cli",
       "public": true,
       "qualname": "run",
       "severity": "advisory",
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py",
       "violation_id": "function:crypto_rsi_scanner/lean_radar/cli.py:run"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_run_cycle",
+      "line_count": 158,
+      "module": "crypto_rsi_scanner.lean_radar.cli",
+      "public": false,
+      "qualname": "_run_cycle",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/cli.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/cli.py:_run_cycle"
     },
     {
       "category": "function_over_150_lines",
@@ -5164,8 +5253,30 @@
     },
     {
       "category": "function_over_150_lines",
+      "function_name": "_today",
+      "line_count": 170,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_render",
+      "public": false,
+      "qualname": "_today",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_render.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/dashboard_render.py:_today"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_health",
+      "line_count": 162,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_render",
+      "public": false,
+      "qualname": "_health",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_render.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/dashboard_render.py:_health"
+    },
+    {
+      "category": "function_over_150_lines",
       "function_name": "refresh_system_health",
-      "line_count": 200,
+      "line_count": 304,
       "module": "crypto_rsi_scanner.lean_radar.health",
       "public": true,
       "qualname": "refresh_system_health",
@@ -5175,8 +5286,19 @@
     },
     {
       "category": "function_over_150_lines",
+      "function_name": "fetch_live_market_rows",
+      "line_count": 200,
+      "module": "crypto_rsi_scanner.lean_radar.market_data",
+      "public": true,
+      "qualname": "fetch_live_market_rows",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/market_data.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/market_data.py:fetch_live_market_rows"
+    },
+    {
+      "category": "function_over_150_lines",
       "function_name": "run_scan",
-      "line_count": 247,
+      "line_count": 263,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -5187,7 +5309,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "build_universe",
-      "line_count": 181,
+      "line_count": 218,
       "module": "crypto_rsi_scanner.lean_radar.universe",
       "public": true,
       "qualname": "build_universe",
@@ -5209,7 +5331,7 @@
     "quantitative_line_counts": "advisory inventory only; never a development or release blocker",
     "test_file_size_debt": "advisory inventory only"
   },
-  "production_classes_over_limit": 8,
+  "production_classes_over_limit": 9,
   "production_classes_over_limit_rows": [
     {
       "accepted_exception": false,
@@ -5269,11 +5391,25 @@
     },
     {
       "accepted_exception": false,
+      "class_name": "AnchoredPath",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 82,
+      "module": "crypto_rsi_scanner.lean_radar.path_security",
+      "owner_note": "",
+      "public": true,
+      "qualname": "AnchoredPath",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/path_security.py"
+    },
+    {
+      "accepted_exception": false,
       "class_name": "LeanRadarStore",
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 945,
+      "line_count": 1570,
       "module": "crypto_rsi_scanner.lean_radar.store",
       "owner_note": "",
       "public": true,
@@ -5359,6 +5495,12 @@
       "limit": 1500,
       "line_count": 1986,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1976,
+      "path": "crypto_rsi_scanner/lean_radar/store.py",
       "source_kind": "production"
     },
     {
@@ -5596,11 +5738,11 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 45,
-  "production_files_over_1500_lines": 12,
+  "production_files_over_1200_lines": 46,
+  "production_files_over_1500_lines": 13,
   "production_files_over_2000_lines": 5,
   "production_files_over_3000_lines": 1,
-  "production_functions_over_limit": 40,
+  "production_functions_over_limit": 44,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -5884,10 +6026,18 @@
     },
     {
       "function_name": "run",
-      "line_count": 179,
+      "line_count": 223,
       "module": "crypto_rsi_scanner.lean_radar.cli",
       "public": true,
       "qualname": "run",
+      "source_path": "crypto_rsi_scanner/lean_radar/cli.py"
+    },
+    {
+      "function_name": "_run_cycle",
+      "line_count": 158,
+      "module": "crypto_rsi_scanner.lean_radar.cli",
+      "public": false,
+      "qualname": "_run_cycle",
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py"
     },
     {
@@ -5899,16 +6049,40 @@
       "source_path": "crypto_rsi_scanner/lean_radar/dashboard_data.py"
     },
     {
+      "function_name": "_today",
+      "line_count": 170,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_render",
+      "public": false,
+      "qualname": "_today",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_render.py"
+    },
+    {
+      "function_name": "_health",
+      "line_count": 162,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_render",
+      "public": false,
+      "qualname": "_health",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_render.py"
+    },
+    {
       "function_name": "refresh_system_health",
-      "line_count": 200,
+      "line_count": 304,
       "module": "crypto_rsi_scanner.lean_radar.health",
       "public": true,
       "qualname": "refresh_system_health",
       "source_path": "crypto_rsi_scanner/lean_radar/health.py"
     },
     {
+      "function_name": "fetch_live_market_rows",
+      "line_count": 200,
+      "module": "crypto_rsi_scanner.lean_radar.market_data",
+      "public": true,
+      "qualname": "fetch_live_market_rows",
+      "source_path": "crypto_rsi_scanner/lean_radar/market_data.py"
+    },
+    {
       "function_name": "run_scan",
-      "line_count": 247,
+      "line_count": 263,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -5916,7 +6090,7 @@
     },
     {
       "function_name": "build_universe",
-      "line_count": 181,
+      "line_count": 218,
       "module": "crypto_rsi_scanner.lean_radar.universe",
       "public": true,
       "qualname": "build_universe",
@@ -6105,11 +6279,25 @@
     },
     {
       "accepted_exception": false,
+      "class_name": "AnchoredPath",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 82,
+      "module": "crypto_rsi_scanner.lean_radar.path_security",
+      "owner_note": "",
+      "public": true,
+      "qualname": "AnchoredPath",
+      "revisit_condition": "",
+      "source_path": "crypto_rsi_scanner/lean_radar/path_security.py"
+    },
+    {
+      "accepted_exception": false,
       "class_name": "LeanRadarStore",
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 945,
+      "line_count": 1570,
       "module": "crypto_rsi_scanner.lean_radar.store",
       "owner_note": "",
       "public": true,
@@ -6118,7 +6306,7 @@
       "source_path": "crypto_rsi_scanner/lean_radar/store.py"
     }
   ],
-  "remaining_class_ownership_debt_count": 5,
+  "remaining_class_ownership_debt_count": 6,
   "research_only": true,
   "resolved_violation_count": 8,
   "resolved_violation_ids": [
@@ -6202,6 +6390,12 @@
       "limit": 1500,
       "line_count": 2369,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1976,
+      "path": "crypto_rsi_scanner/lean_radar/store.py",
       "source_kind": "production"
     },
     {
@@ -6301,7 +6495,7 @@
       "source_kind": "production"
     }
   ],
-  "unresolved_production_files_over_1200_lines": 20,
+  "unresolved_production_files_over_1200_lines": 21,
   "v3_accepted_exceptions": {},
   "v3_auto_accept_blockers": [],
   "v3_auto_accept_ready": true,
@@ -6327,14 +6521,14 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 40,
+      "functions_over_150_lines": 44,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 45,
-      "production_files_over_1500_lines": 12,
+      "production_files_over_1200_lines": 46,
+      "production_files_over_1500_lines": 13,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
       "shim_removal_blockers": 0
@@ -6370,6 +6564,11 @@
       {
         "line_count": 1986,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1976,
+        "path": "crypto_rsi_scanner/lean_radar/store.py",
         "threshold": 1200
       },
       {
@@ -6600,6 +6799,11 @@
         "threshold": 1500
       },
       {
+        "line_count": 1976,
+        "path": "crypto_rsi_scanner/lean_radar/store.py",
+        "threshold": 1500
+      },
+      {
         "line_count": 1888,
         "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py",
         "threshold": 1500
@@ -6644,14 +6848,14 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 40,
+    "functions_over_150_lines": 44,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 45,
-    "production_files_over_1500_lines": 12,
+    "production_files_over_1200_lines": 46,
+    "production_files_over_1500_lines": 13,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,
     "shim_removal_blockers": 0
@@ -6662,6 +6866,7 @@
     "class:crypto_rsi_scanner/lean_radar/models.py:LeanIdea",
     "class:crypto_rsi_scanner/lean_radar/models.py:LeanOutcome",
     "class:crypto_rsi_scanner/lean_radar/models.py:MarketSnapshot",
+    "class:crypto_rsi_scanner/lean_radar/path_security.py:AnchoredPath",
     "class:crypto_rsi_scanner/lean_radar/store.py:LeanRadarStore",
     "class:crypto_rsi_scanner/storage_parts/migrations.py:MigrationsMixin",
     "class:crypto_rsi_scanner/storage_parts/signals.py:SignalsMixin",
@@ -6678,6 +6883,7 @@
     "file:crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
     "file:crypto_rsi_scanner/event_alpha/radar/market_history.py",
     "file:crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
+    "file:crypto_rsi_scanner/lean_radar/store.py",
     "file:tests/cli/test_make_targets.py",
     "file:tests/event_alpha/test_burn_in_operations.py",
     "file:tests/event_alpha/test_decision_model_v2.py",
@@ -6722,9 +6928,13 @@
     "function:crypto_rsi_scanner/event_alpha/radar/market_state.py:snapshot_from_market_row",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row",
     "function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_hypothesis_latest_score_components",
+    "function:crypto_rsi_scanner/lean_radar/cli.py:_run_cycle",
     "function:crypto_rsi_scanner/lean_radar/cli.py:run",
     "function:crypto_rsi_scanner/lean_radar/dashboard_data.py:load_dashboard_state",
+    "function:crypto_rsi_scanner/lean_radar/dashboard_render.py:_health",
+    "function:crypto_rsi_scanner/lean_radar/dashboard_render.py:_today",
     "function:crypto_rsi_scanner/lean_radar/health.py:refresh_system_health",
+    "function:crypto_rsi_scanner/lean_radar/market_data.py:fetch_live_market_rows",
     "function:crypto_rsi_scanner/lean_radar/scan.py:run_scan",
     "function:crypto_rsi_scanner/lean_radar/universe.py:build_universe"
   ],
@@ -6836,6 +7046,15 @@
       "severity": "advisory",
       "source_kind": "production",
       "violation_id": "file:crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 1976,
+      "path": "crypto_rsi_scanner/lean_radar/store.py",
+      "severity": "advisory",
+      "source_kind": "production",
+      "violation_id": "file:crypto_rsi_scanner/lean_radar/store.py"
     },
     {
       "category": "file_over_1500_lines",
@@ -6989,11 +7208,28 @@
     {
       "accepted_exception": false,
       "category": "class_over_75_lines",
+      "class_name": "AnchoredPath",
+      "exception_category": "",
+      "exception_reason": null,
+      "exception_status": "",
+      "line_count": 82,
+      "module": "crypto_rsi_scanner.lean_radar.path_security",
+      "owner_note": "",
+      "public": true,
+      "qualname": "AnchoredPath",
+      "revisit_condition": "",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/path_security.py",
+      "violation_id": "class:crypto_rsi_scanner/lean_radar/path_security.py:AnchoredPath"
+    },
+    {
+      "accepted_exception": false,
+      "category": "class_over_75_lines",
       "class_name": "LeanRadarStore",
       "exception_category": "",
       "exception_reason": null,
       "exception_status": "",
-      "line_count": 945,
+      "line_count": 1570,
       "module": "crypto_rsi_scanner.lean_radar.store",
       "owner_note": "",
       "public": true,
@@ -7442,13 +7678,24 @@
     {
       "category": "function_over_150_lines",
       "function_name": "run",
-      "line_count": 179,
+      "line_count": 223,
       "module": "crypto_rsi_scanner.lean_radar.cli",
       "public": true,
       "qualname": "run",
       "severity": "advisory",
       "source_path": "crypto_rsi_scanner/lean_radar/cli.py",
       "violation_id": "function:crypto_rsi_scanner/lean_radar/cli.py:run"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_run_cycle",
+      "line_count": 158,
+      "module": "crypto_rsi_scanner.lean_radar.cli",
+      "public": false,
+      "qualname": "_run_cycle",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/cli.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/cli.py:_run_cycle"
     },
     {
       "category": "function_over_150_lines",
@@ -7463,8 +7710,30 @@
     },
     {
       "category": "function_over_150_lines",
+      "function_name": "_today",
+      "line_count": 170,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_render",
+      "public": false,
+      "qualname": "_today",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_render.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/dashboard_render.py:_today"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_health",
+      "line_count": 162,
+      "module": "crypto_rsi_scanner.lean_radar.dashboard_render",
+      "public": false,
+      "qualname": "_health",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/dashboard_render.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/dashboard_render.py:_health"
+    },
+    {
+      "category": "function_over_150_lines",
       "function_name": "refresh_system_health",
-      "line_count": 200,
+      "line_count": 304,
       "module": "crypto_rsi_scanner.lean_radar.health",
       "public": true,
       "qualname": "refresh_system_health",
@@ -7474,8 +7743,19 @@
     },
     {
       "category": "function_over_150_lines",
+      "function_name": "fetch_live_market_rows",
+      "line_count": 200,
+      "module": "crypto_rsi_scanner.lean_radar.market_data",
+      "public": true,
+      "qualname": "fetch_live_market_rows",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/lean_radar/market_data.py",
+      "violation_id": "function:crypto_rsi_scanner/lean_radar/market_data.py:fetch_live_market_rows"
+    },
+    {
+      "category": "function_over_150_lines",
       "function_name": "run_scan",
-      "line_count": 247,
+      "line_count": 263,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -7486,7 +7766,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "build_universe",
-      "line_count": 181,
+      "line_count": 218,
       "module": "crypto_rsi_scanner.lean_radar.universe",
       "public": true,
       "qualname": "build_universe",

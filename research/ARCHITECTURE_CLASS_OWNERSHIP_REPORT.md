@@ -2,20 +2,20 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-23T04:46:11.591787+00:00`
-- public_class_count: `532`
-- classes_over_limit_count: `8`
-- functions_over_limit_count: `40`
-- production_classes_over_limit: `8`
-- production_functions_over_limit: `40`
+- generated_at: `2026-07-24T12:42:06.109649+00:00`
+- public_class_count: `533`
+- classes_over_limit_count: `9`
+- functions_over_limit_count: `44`
+- production_classes_over_limit: `9`
+- production_functions_over_limit: `44`
 - accepted_class_exceptions_count: `3`
-- remaining_class_ownership_debt_count: `5`
+- remaining_class_ownership_debt_count: `6`
 - v3_gate_status: `pass`
 - v3_auto_accept_ready: `True`
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `40`
+- functions_over_150_lines: `44`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `85`
@@ -44,11 +44,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 45 | advisory |
-| `production_files_over_1500_lines` | 12 | advisory |
+| `production_files_over_1200_lines` | 46 | advisory |
+| `production_files_over_1500_lines` | 13 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 40 | advisory |
+| `functions_over_150_lines` | 44 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -311,7 +311,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.lean_radar.models` | `MarketSnapshot` | 78 | true | false |  |
 | `crypto_rsi_scanner.lean_radar.models` | `LeanIdea` | 104 | true | false |  |
 | `crypto_rsi_scanner.lean_radar.models` | `LeanOutcome` | 123 | true | false |  |
-| `crypto_rsi_scanner.lean_radar.store` | `LeanRadarStore` | 945 | true | false |  |
+| `crypto_rsi_scanner.lean_radar.path_security` | `AnchoredPath` | 82 | true | false |  |
+| `crypto_rsi_scanner.lean_radar.store` | `LeanRadarStore` | 1570 | true | false |  |
 | `crypto_rsi_scanner.storage_parts.migrations` | `MigrationsMixin` | 88 | true | true | SQLite migration ownership is intentionally centralized to avoid untested schema drift. |
 | `crypto_rsi_scanner.storage_parts.signals` | `SignalsMixin` | 129 | true | true | Signal persistence methods share schema assumptions, row serialization, and outcome lookup behavior. |
 | `crypto_rsi_scanner.storage_parts.watchlist` | `WatchlistMixin` | 89 | true | true | Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit. |
@@ -355,8 +356,12 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.market_state` | `snapshot_from_market_row` | 175 | true |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_hypothesis_latest_score_components` | 153 | false |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 160 | false |
-| `crypto_rsi_scanner.lean_radar.cli` | `run` | 179 | true |
+| `crypto_rsi_scanner.lean_radar.cli` | `run` | 223 | true |
+| `crypto_rsi_scanner.lean_radar.cli` | `_run_cycle` | 158 | false |
 | `crypto_rsi_scanner.lean_radar.dashboard_data` | `load_dashboard_state` | 168 | true |
-| `crypto_rsi_scanner.lean_radar.health` | `refresh_system_health` | 200 | true |
-| `crypto_rsi_scanner.lean_radar.scan` | `run_scan` | 247 | true |
-| `crypto_rsi_scanner.lean_radar.universe` | `build_universe` | 181 | true |
+| `crypto_rsi_scanner.lean_radar.dashboard_render` | `_today` | 170 | false |
+| `crypto_rsi_scanner.lean_radar.dashboard_render` | `_health` | 162 | false |
+| `crypto_rsi_scanner.lean_radar.health` | `refresh_system_health` | 304 | true |
+| `crypto_rsi_scanner.lean_radar.market_data` | `fetch_live_market_rows` | 200 | true |
+| `crypto_rsi_scanner.lean_radar.scan` | `run_scan` | 263 | true |
+| `crypto_rsi_scanner.lean_radar.universe` | `build_universe` | 218 | true |

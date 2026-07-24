@@ -118,6 +118,8 @@ LEAN_RADAR_MARKET_OBSERVED_AT ?=
 LEAN_RADAR_OUTCOMES_EVALUATED_AT ?=
 LEAN_RADAR_HEALTH_EVALUATED_AT ?=
 LEAN_RADAR_TELEGRAM_EVALUATED_AT ?=
+LEAN_RADAR_MAINTENANCE_EVALUATED_AT ?=
+LEAN_RADAR_VACUUM ?= 0
 LEAN_RADAR_DASHBOARD_HOST ?= 127.0.0.1
 LEAN_RADAR_DASHBOARD_PORT ?= 8766
 LEAN_RADAR_WATCHLIST_ASSET_ID ?=
@@ -128,6 +130,8 @@ LEAN_RADAR_MARKET_OBSERVED_AT_ARG = $(if $(strip $(LEAN_RADAR_MARKET_OBSERVED_AT
 LEAN_RADAR_OUTCOMES_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_OUTCOMES_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_OUTCOMES_EVALUATED_AT),)
 LEAN_RADAR_HEALTH_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_HEALTH_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_HEALTH_EVALUATED_AT),)
 LEAN_RADAR_TELEGRAM_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_TELEGRAM_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_TELEGRAM_EVALUATED_AT),)
+LEAN_RADAR_MAINTENANCE_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_MAINTENANCE_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_MAINTENANCE_EVALUATED_AT),)
+LEAN_RADAR_VACUUM_ARG = $(if $(filter 1 true yes,$(LEAN_RADAR_VACUUM)),--vacuum,)
 RADAR_MARKET_NO_SEND_PYTHON = $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
 RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 RADAR_DAILY_OPS_INTERVAL_SECONDS ?= 300
@@ -277,7 +281,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
 .PHONY: radar-unlock-tokenomist-v5-smoke radar-unlock-tokenomist-v5-capture-smoke radar-unlock-tokenomist-v5-readiness
-.PHONY: lean-radar lean-radar-cycle lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health lean-radar-dashboard lean-radar-dashboard-smoke lean-radar-telegram-preview lean-radar-telegram-readiness lean-radar-telegram-send
+.PHONY: lean-radar lean-radar-cycle lean-radar-scheduled-cycle lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health lean-radar-dashboard lean-radar-dashboard-smoke lean-radar-telegram-preview lean-radar-telegram-readiness lean-radar-telegram-send lean-radar-db-maintenance-dry-run lean-radar-db-maintenance lean-radar-maintenance-readiness lean-radar-maintenance-status lean-radar-maintenance-install lean-radar-maintenance-uninstall lean-radar-verify
 
 help:
 	@echo "Targets:"
@@ -299,6 +303,12 @@ help:
 	@echo "  make lean-radar-outcomes  Mature due horizons from retained point-in-time snapshots; no provider call"
 	@echo "  make lean-radar-scan  Lower-level scan-only command retained for diagnostics/imports"
 	@echo "  make lean-radar-dashboard-smoke  Render every Lean dashboard page offline"
+	@echo "  make lean-radar-db-maintenance-dry-run  Preview bounded SQLite compaction/retention; no write"
+	@echo "  CONFIRM=1 make lean-radar-db-maintenance  Apply bounded retention (LEAN_RADAR_VACUUM=1 is optional)"
+	@echo "  make lean-radar-maintenance-readiness  Inspect the prepared macOS scheduler; no install or provider call"
+	@echo "  CONFIRM=1 make lean-radar-maintenance-install  Install the no-send scheduled cycle"
+	@echo "  CONFIRM=1 make lean-radar-maintenance-uninstall  Disable only the exact owned scheduled cycle"
+	@echo "  make lean-radar-verify  Run the focused Lean product release gate"
 	@echo "  Verification and research tooling"
 	@echo "  make bootstrap  Create .venv and install hash-pinned requirements.txt"
 	@echo "  make dependency-tools  Install pinned uv and pip-audit tooling into the selected Python environment"
@@ -1437,6 +1447,11 @@ lean-radar-cycle:
 		--source-mode $(LEAN_RADAR_MARKET_MODE) \
 		$(LEAN_RADAR_MARKET_ROWS_ARG) $(LEAN_RADAR_MARKET_OBSERVED_AT_ARG)
 
+lean-radar-scheduled-cycle:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) scheduled-cycle
+
 lean-radar-calendar-readiness:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
@@ -1460,6 +1475,41 @@ lean-radar-health:
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
 		--db $(LEAN_RADAR_DB_PATH) health $(LEAN_RADAR_HEALTH_EVALUATED_AT_ARG)
 
+lean-radar-db-maintenance-dry-run:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) db-maintenance \
+		$(LEAN_RADAR_MAINTENANCE_EVALUATED_AT_ARG)
+
+lean-radar-db-maintenance:
+	@test "$(CONFIRM)" = "1" || { echo "Refusing Lean Radar database maintenance without CONFIRM=1" >&2; exit 2; }
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) db-maintenance --confirm \
+		$(LEAN_RADAR_VACUUM_ARG) $(LEAN_RADAR_MAINTENANCE_EVALUATED_AT_ARG)
+
+lean-radar-maintenance-readiness:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) maintenance-readiness
+
+lean-radar-maintenance-status:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) maintenance-status
+
+lean-radar-maintenance-install:
+	@test "$(CONFIRM)" = "1" || { echo "Refusing Lean Radar maintenance installation without CONFIRM=1" >&2; exit 2; }
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) maintenance-install --confirm
+
+lean-radar-maintenance-uninstall:
+	@test "$(CONFIRM)" = "1" || { echo "Refusing Lean Radar maintenance removal without CONFIRM=1" >&2; exit 2; }
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) maintenance-uninstall --confirm
+
 lean-radar-dashboard:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar.dashboard \
@@ -1467,6 +1517,14 @@ lean-radar-dashboard:
 		--host $(LEAN_RADAR_DASHBOARD_HOST) --port $(LEAN_RADAR_DASHBOARD_PORT)
 
 lean-radar-dashboard-smoke:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar.dashboard --smoke
+
+lean-radar-verify:
+	$(PYTHON) -m compileall -q crypto_rsi_scanner/lean_radar tests/lean_radar
+	env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+	$(PYTHON) -m pytest -q \
+		tests/lean_radar tests/test_indicators.py
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar.dashboard --smoke
 

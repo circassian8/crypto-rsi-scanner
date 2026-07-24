@@ -16,7 +16,7 @@ from .store import SCHEMA_VERSION, LeanRadarStore, LeanRadarStoreError
 
 MAX_IDEAS = 500
 MAX_OUTCOMES = MAX_IDEAS * 4
-MAX_MARKETS = 250
+MAX_MARKETS = 300
 MAX_CALENDAR_EVENTS = 500
 MAX_IDEA_HISTORY_POINTS = 512
 _IDEA_ID = re.compile(r"^lean-[a-z0-9-]{3,96}$")
@@ -75,7 +75,7 @@ def load_dashboard_state(
     if now.tzinfo is None:
         raise LeanDashboardDataError("dashboard clock must be timezone-aware")
     now = now.astimezone(timezone.utc)
-    if not store.path.exists():
+    if not store.exists():
         raise LeanDashboardDataError("Lean Radar runtime is not initialized")
     try:
         with store.connect() as connection:
@@ -239,7 +239,7 @@ def load_dashboard_state(
 def load_idea_detail(store: LeanRadarStore, idea_id: str) -> _LeanIdeaDetail | None:
     if not isinstance(idea_id, str) or not _IDEA_ID.fullmatch(idea_id):
         return None
-    if not store.path.exists():
+    if not store.exists():
         raise LeanDashboardDataError("Lean Radar runtime is not initialized")
     try:
         with store.connect() as connection:

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import hashlib
 import math
 import os
+import re
 from typing import Mapping, Sequence
 
 import pandas as pd
@@ -14,11 +16,20 @@ from crypto_rsi_scanner import config as shared_config
 from crypto_rsi_scanner.client import CoinGeckoClient
 from crypto_rsi_scanner.indicators import wilder_rsi
 
-from .models import MarketSnapshot, UniverseAsset
+from .models import BybitInstrument, MarketSnapshot, UniverseAsset
+from .universe import LeanUniverseError, build_universe
 
 
 LIVE_AUTH_ENV = "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE"
-MAX_LIVE_ROWS = 250
+MAX_LIVE_ROWS = 1_000
+LIVE_PAGE_SIZE = 250
+MAX_RANKED_PAGES = 4
+MAX_WATCHLIST_IDS = 100
+WATCHLIST_BATCH_SIZE = 50
+MAX_LIVE_PROVIDER_CALLS = MAX_RANKED_PAGES + (
+    MAX_WATCHLIST_IDS // WATCHLIST_BATCH_SIZE
+)
+_COINGECKO_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,127}$")
 
 
 class _MarketDataError(ValueError):
@@ -40,31 +51,192 @@ def live_provider_authorized(environ: Mapping[str, str] | None = None) -> bool:
 
 def fetch_live_market_rows(
     *,
+    instruments: Sequence[BybitInstrument],
+    manual_watchlist: Sequence[Mapping[str, object]] = (),
     environ: Mapping[str, str] | None = None,
-    limit: int = MAX_LIVE_ROWS,
+    target_count: int = 200,
+    page_size: int = LIVE_PAGE_SIZE,
+    max_ranked_pages: int = MAX_RANKED_PAGES,
 ) -> tuple[tuple[Mapping[str, object], ...], dict[str, object]]:
-    """Make one already-authorized public CoinGecko market-list request."""
+    """Collect an exact, bounded CoinGecko volume-ranked universe.
+
+    Ranked pages continue until the confirmed Bybit intersection reaches the
+    target, CoinGecko is exhausted, or the explicit page budget is consumed.
+    Missing manual-watchlist IDs then receive separate exact-ID requests.
+    """
 
     if not live_provider_authorized(environ):
         raise MarketDataError(f"{LIVE_AUTH_ENV}=1 is required for a live scan")
     if shared_config.FIXTURE_DIR is not None:
         raise MarketDataError("fixture mode must be unset before a live scan")
-    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 250:
-        raise MarketDataError("live market row limit must be between 1 and 250")
+    if (
+        isinstance(target_count, bool)
+        or not isinstance(target_count, int)
+        or not 1 <= target_count <= 200
+    ):
+        raise MarketDataError("live eligible-asset target must be between 1 and 200")
+    if (
+        isinstance(page_size, bool)
+        or not isinstance(page_size, int)
+        or not 1 <= page_size <= LIVE_PAGE_SIZE
+    ):
+        raise MarketDataError("live market page size must be between 1 and 250")
+    if (
+        isinstance(max_ranked_pages, bool)
+        or not isinstance(max_ranked_pages, int)
+        or not 1 <= max_ranked_pages <= MAX_RANKED_PAGES
+    ):
+        raise MarketDataError("live ranked-page budget must be between 1 and 4")
+    if not instruments:
+        raise MarketDataError("confirmed Bybit instruments are required")
+    requested_watchlist_ids = _watchlist_ids(manual_watchlist)
 
     async def collect() -> tuple[tuple[Mapping[str, object], ...], dict[str, object]]:
         client = CoinGeckoClient(timeout_seconds=8.0, max_retries=1)
+        ranked_rows: list[Mapping[str, object]] = []
+        targeted_rows: list[Mapping[str, object]] = []
+        seen_ranked_ids: set[str] = set()
+        request_ledger: list[dict[str, object]] = []
+        exhausted = False
+        eligible_count = 0
         async with client:
-            rows = await client.get_top_markets_by_volume(limit)
-        materialized = tuple(row for row in rows if isinstance(row, Mapping))
-        telemetry = dict(client.last_request_telemetry or {})
+            for page in range(1, max_ranked_pages + 1):
+                page_rows = await _request_market_rows(
+                    client,
+                    {
+                        "vs_currency": "usd",
+                        "order": "volume_desc",
+                        "per_page": page_size,
+                        "page": page,
+                        "sparkline": "true",
+                        "price_change_percentage": "1h,24h,7d",
+                    },
+                )
+                request_ledger.append(
+                    _request_receipt(
+                        client.last_request_telemetry,
+                        request_type="ranked_page",
+                        ordinal=page,
+                        result_count=len(page_rows),
+                    )
+                )
+                for raw in page_rows:
+                    canonical_id = _row_id(raw)
+                    if canonical_id in seen_ranked_ids:
+                        raise MarketDataError(
+                            "CoinGecko ranked pages contain a duplicate asset identity"
+                        )
+                    seen_ranked_ids.add(canonical_id)
+                    ranked_rows.append(
+                        {**dict(raw), "_lean_acquisition_origin": "ranked"}
+                    )
+                try:
+                    eligible_count = build_universe(
+                        ranked_rows,
+                        instruments,
+                        (),
+                        limit=target_count,
+                    ).eligible_ranked_count
+                except LeanUniverseError as exc:
+                    raise MarketDataError(
+                        "CoinGecko ranked market rows failed universe validation"
+                    ) from exc
+                if eligible_count >= target_count:
+                    break
+                if len(page_rows) < page_size:
+                    exhausted = True
+                    break
+
+            missing_watchlist = tuple(
+                asset_id
+                for asset_id in requested_watchlist_ids
+                if asset_id not in seen_ranked_ids
+            )
+            bounded_watchlist = missing_watchlist[:MAX_WATCHLIST_IDS]
+            seen_targeted: set[str] = set()
+            for batch_number, offset in enumerate(
+                range(0, len(bounded_watchlist), WATCHLIST_BATCH_SIZE),
+                start=1,
+            ):
+                batch = bounded_watchlist[offset : offset + WATCHLIST_BATCH_SIZE]
+                page_rows = await _request_market_rows(
+                    client,
+                    {
+                        "vs_currency": "usd",
+                        "ids": ",".join(batch),
+                        "order": "volume_desc",
+                        "per_page": len(batch),
+                        "page": 1,
+                        "sparkline": "true",
+                        "price_change_percentage": "1h,24h,7d",
+                    },
+                )
+                request_ledger.append(
+                    _request_receipt(
+                        client.last_request_telemetry,
+                        request_type="targeted_watchlist",
+                        ordinal=batch_number,
+                        result_count=len(page_rows),
+                        requested_ids=batch,
+                    )
+                )
+                allowed = set(batch)
+                for raw in page_rows:
+                    canonical_id = _row_id(raw)
+                    if (
+                        canonical_id not in allowed
+                        or canonical_id in seen_ranked_ids
+                        or canonical_id in seen_targeted
+                    ):
+                        raise MarketDataError(
+                            "CoinGecko targeted response identity is inconsistent"
+                        )
+                    seen_targeted.add(canonical_id)
+                    targeted_rows.append(
+                        {
+                            **dict(raw),
+                            "_lean_acquisition_origin": "targeted_watchlist",
+                        }
+                    )
+        page_budget_reached = (
+            eligible_count < target_count
+            and not exhausted
+            and len(
+                [
+                    row
+                    for row in request_ledger
+                    if row["request_type"] == "ranked_page"
+                ]
+            )
+            == max_ranked_pages
+        )
+        materialized = tuple(ranked_rows + targeted_rows)
         return materialized, {
-            "endpoint_path": telemetry.get("endpoint_path"),
-            "http_status": telemetry.get("http_status"),
+            "schema_version": "lean_market_acquisition_v1",
+            "provider": "coingecko",
+            "endpoint_path": "/coins/markets",
+            "order": "volume_desc",
+            "eligible_target_count": target_count,
+            "eligible_ranked_count": eligible_count,
+            "ranked_page_count": sum(
+                row["request_type"] == "ranked_page" for row in request_ledger
+            ),
+            "ranked_row_count": len(ranked_rows),
+            "ranked_source_exhausted": exhausted,
+            "ranked_page_budget_reached": page_budget_reached,
+            "target_reached": eligible_count >= target_count,
+            "watchlist_configured_count": len(requested_watchlist_ids),
+            "watchlist_missing_from_ranked_count": len(missing_watchlist),
+            "watchlist_targeted_requested_count": len(bounded_watchlist),
+            "watchlist_targeted_returned_count": len(targeted_rows),
+            "watchlist_target_budget_truncated_count": max(
+                0, len(missing_watchlist) - len(bounded_watchlist)
+            ),
             "result_count": len(materialized),
-            "retry_count": telemetry.get("retry_count", 0),
-            "duration_ms": telemetry.get("duration_ms"),
-            "error_class": telemetry.get("error_class"),
+            "provider_call_count": len(request_ledger),
+            "provider_call_budget": MAX_LIVE_PROVIDER_CALLS,
+            "request_ledger": request_ledger,
+            "research_only": True,
         }
 
     try:
@@ -77,6 +249,78 @@ def fetch_live_market_rows(
         except Exception as exc:
             raise MarketDataError("live market collection failed") from exc
     raise MarketDataError("live market collection cannot run inside an active event loop")
+
+
+async def _request_market_rows(
+    client: CoinGeckoClient,
+    params: dict[str, object],
+) -> tuple[Mapping[str, object], ...]:
+    payload = await client._get("/coins/markets", params)
+    if not isinstance(payload, list) or len(payload) > LIVE_PAGE_SIZE:
+        raise MarketDataError("CoinGecko market response is not a bounded array")
+    if not all(isinstance(row, Mapping) for row in payload):
+        raise MarketDataError("CoinGecko market response contains a non-object row")
+    return tuple(payload)
+
+
+def _row_id(row: Mapping[str, object]) -> str:
+    value = row.get("id")
+    if not isinstance(value, str):
+        raise MarketDataError("CoinGecko market row has no typed asset identity")
+    canonical_id = value.strip()
+    if not _COINGECKO_ID.fullmatch(canonical_id):
+        raise MarketDataError("CoinGecko market row asset identity is invalid")
+    return canonical_id
+
+
+def _watchlist_ids(
+    manual_watchlist: Sequence[Mapping[str, object]],
+) -> tuple[str, ...]:
+    identities: list[str] = []
+    seen: set[str] = set()
+    for row in manual_watchlist:
+        value = row.get("canonical_asset_id")
+        if not isinstance(value, str):
+            raise MarketDataError("watchlist asset identity is invalid")
+        canonical_id = value.strip()
+        if (
+            not _COINGECKO_ID.fullmatch(canonical_id)
+            or canonical_id in seen
+        ):
+            raise MarketDataError("watchlist asset identity is invalid or duplicated")
+        seen.add(canonical_id)
+        identities.append(canonical_id)
+    return tuple(sorted(identities))
+
+
+def _request_receipt(
+    telemetry: Mapping[str, object] | None,
+    *,
+    request_type: str,
+    ordinal: int,
+    result_count: int,
+    requested_ids: Sequence[str] = (),
+) -> dict[str, object]:
+    values = telemetry or {}
+    receipt: dict[str, object] = {
+        "request_type": request_type,
+        "ordinal": ordinal,
+        "endpoint_path": "/coins/markets",
+        "http_status": values.get("http_status"),
+        "result_count": result_count,
+        "retry_count": values.get("retry_count", 0),
+        "duration_ms": values.get("duration_ms"),
+        "error_class": values.get("error_class"),
+    }
+    if requested_ids:
+        encoded = "\n".join(requested_ids).encode("utf-8")
+        receipt.update(
+            {
+                "requested_id_count": len(requested_ids),
+                "requested_ids_sha256": hashlib.sha256(encoded).hexdigest(),
+            }
+        )
+    return receipt
 
 
 def normalize_snapshots(
@@ -238,7 +482,11 @@ def _optional_nonnegative(value: object, label: str) -> float | None:
 
 __all__ = (
     "LIVE_AUTH_ENV",
+    "LIVE_PAGE_SIZE",
+    "MAX_LIVE_PROVIDER_CALLS",
     "MAX_LIVE_ROWS",
+    "MAX_RANKED_PAGES",
+    "MAX_WATCHLIST_IDS",
     "MarketDataError",
     "fetch_live_market_rows",
     "live_provider_authorized",

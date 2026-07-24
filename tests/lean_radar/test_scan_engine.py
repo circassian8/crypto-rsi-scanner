@@ -32,7 +32,12 @@ from crypto_rsi_scanner.client import CoinGeckoClient
 NOW = datetime(2026, 7, 23, 12, 0, tzinfo=timezone.utc)
 
 
-def _instrument(symbol: str, *, source_mode: str = "fixture") -> BybitInstrument:
+def _instrument(
+    symbol: str,
+    *,
+    source_mode: str = "fixture",
+    observed_at: datetime = NOW,
+) -> BybitInstrument:
     return BybitInstrument(
         instrument_id=f"{symbol}USDT",
         base_coin=symbol,
@@ -46,7 +51,7 @@ def _instrument(symbol: str, *, source_mode: str = "fixture") -> BybitInstrument
         maximum_limit_quantity="100000",
         maximum_market_quantity="10000",
         minimum_notional_usdt="5",
-        source_observed_at=NOW.isoformat(),
+        source_observed_at=observed_at.isoformat(),
         source_mode=source_mode,
         source_sha256="a" * 64,
     )
@@ -151,11 +156,20 @@ def _scan_rows() -> tuple[dict[str, object], ...]:
     )
 
 
-def _store(tmp_path: Path, *, source_mode: str = "fixture") -> LeanRadarStore:
+def _store(
+    tmp_path: Path,
+    *,
+    source_mode: str = "fixture",
+    catalog_observed_at: datetime = NOW,
+) -> LeanRadarStore:
     store = LeanRadarStore(tmp_path / "lean.db")
     store.replace_bybit_catalog(
         tuple(
-            _instrument(symbol, source_mode=source_mode)
+            _instrument(
+                symbol,
+                source_mode=source_mode,
+                observed_at=catalog_observed_at,
+            )
             for symbol in ("BTC", "ETH", "SOL", "XRP", "DOGE")
         )
     )
@@ -508,7 +522,11 @@ def test_operator_scan_fails_nonzero_before_authorization(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = _store(tmp_path, source_mode="imported_catalog")
+    store = _store(
+        tmp_path,
+        source_mode="imported_catalog",
+        catalog_observed_at=datetime.now(timezone.utc),
+    )
     monkeypatch.delenv("RSI_EVENT_DISCOVERY_UNIVERSE_LIVE", raising=False)
 
     code, result = run(("--db", str(store.path), "scan"))
@@ -600,9 +618,13 @@ def test_provider_failure_is_recorded_truthfully_and_throttles_retry(
 def test_invalid_provider_evidence_records_successful_call_without_hiding_last_ideas(
     tmp_path: Path,
 ) -> None:
-    store = _store(tmp_path, source_mode="imported_catalog")
-    settings = LeanRadarSettings(db_path=store.path, cadence_minutes=20)
     prior_time = NOW - timedelta(minutes=30)
+    store = _store(
+        tmp_path,
+        source_mode="imported_catalog",
+        catalog_observed_at=prior_time,
+    )
+    settings = LeanRadarSettings(db_path=store.path, cadence_minutes=20)
     complete = run_scan(
         store,
         settings,

@@ -31,6 +31,12 @@ class LeanUniverseResult:
     top_liquid_count: int
     watchlist_count: int
     exclusion_counts: Mapping[str, int]
+    ranked_market_input_count: int = 0
+    targeted_watchlist_input_count: int = 0
+    ranked_rows_considered: int = 0
+    eligible_ranked_count: int = 0
+    ranked_target_count: int = TOP_LIQUID_LIMIT
+    ranked_completion_status: str = "input_exhausted"
     research_only: bool = True
 
     def to_dict(self) -> dict[str, object]:
@@ -43,6 +49,12 @@ class LeanUniverseResult:
             "market_input_count": self.market_input_count,
             "top_liquid_count": self.top_liquid_count,
             "watchlist_count": self.watchlist_count,
+            "ranked_market_input_count": self.ranked_market_input_count,
+            "targeted_watchlist_input_count": self.targeted_watchlist_input_count,
+            "ranked_rows_considered": self.ranked_rows_considered,
+            "eligible_ranked_count": self.eligible_ranked_count,
+            "ranked_target_count": self.ranked_target_count,
+            "ranked_completion_status": self.ranked_completion_status,
             "exclusion_counts": dict(sorted(self.exclusion_counts.items())),
             "venue": "bybit",
             "instrument_type": "usdt_perpetual",
@@ -71,6 +83,8 @@ def build_universe(
     manual_watchlist: Sequence[Mapping[str, object]] = (),
     *,
     limit: int = TOP_LIQUID_LIMIT,
+    ranked_source_exhausted: bool | None = None,
+    ranked_page_budget_reached: bool = False,
 ) -> LeanUniverseResult:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
         raise LeanUniverseError("universe limit must be between 1 and 200")
@@ -103,39 +117,60 @@ def build_universe(
         ):
             excluded["missing_identity"] += 1
             continue
-        clean.append({
-            **row,
-            "id": str(canonical_id).strip(),
-            "symbol": str(symbol).strip().upper(),
-            "name": str(name).strip(),
-            "_volume": volume,
-            "_market_cap": market_cap,
-        })
-    clean.sort(
+        acquisition_origin = row.get("_lean_acquisition_origin", "ranked")
+        if acquisition_origin not in {"ranked", "targeted_watchlist"}:
+            raise LeanUniverseError("market acquisition origin is invalid")
+        clean.append(
+            {
+                **row,
+                "id": str(canonical_id).strip(),
+                "symbol": str(symbol).strip().upper(),
+                "name": str(name).strip(),
+                "_volume": volume,
+                "_market_cap": market_cap,
+                "_lean_acquisition_origin": acquisition_origin,
+            }
+        )
+    ranked_clean = [
+        row for row in clean if row["_lean_acquisition_origin"] == "ranked"
+    ]
+    targeted_clean = [
+        row
+        for row in clean
+        if row["_lean_acquisition_origin"] == "targeted_watchlist"
+    ]
+    ranked_clean.sort(
         key=lambda row: (
             -float(row["_volume"]),
             _rank_value(row.get("market_cap_rank")),
             str(row["id"]),
         )
     )
-    top = clean[:limit]
-    symbol_counts = Counter(str(row["symbol"]) for row in top)
+    symbol_counts = Counter(str(row["symbol"]) for row in clean)
     market_by_id = {str(row["id"]): row for row in clean}
+    if len(market_by_id) != len(clean):
+        raise LeanUniverseError("market canonical identity is duplicated")
     instrument_by_base = {row.base_coin: row for row in instruments}
     if len(instrument_by_base) != len(instruments):
         raise LeanUniverseError("Bybit base-coin identity is ambiguous")
 
     active_by_id: dict[str, UniverseAsset] = {}
     blocked_by_key: dict[tuple[str, str], UniverseAsset] = {}
-    for rank, row in enumerate(top, start=1):
+    ranked_rows_considered = 0
+    eligible_ranked_count = 0
+    for row in ranked_clean:
+        if eligible_ranked_count >= limit:
+            break
+        ranked_rows_considered += 1
         candidate = _resolve_asset(
             row,
             instrument_by_base,
-            liquidity_rank=rank,
+            liquidity_rank=eligible_ranked_count + 1,
             origins=("top_liquid",),
             ambiguous_symbol=symbol_counts[str(row["symbol"])] != 1,
         )
         if candidate.active:
+            eligible_ranked_count += 1
             active_by_id[candidate.canonical_asset_id] = candidate
         else:
             blocked_by_key[(candidate.canonical_asset_id, "top_liquid")] = candidate
@@ -237,14 +272,28 @@ def build_universe(
         status = "no_verified_active_assets"
     else:
         status = "ready"
+    if eligible_ranked_count >= limit:
+        ranked_completion_status = "target_reached"
+    elif ranked_page_budget_reached:
+        ranked_completion_status = "page_budget_shortfall"
+    elif ranked_source_exhausted is True:
+        ranked_completion_status = "provider_exhausted_shortfall"
+    else:
+        ranked_completion_status = "input_exhausted"
     return LeanUniverseResult(
         status=status,
         active_assets=active,
         blocked_assets=blocked,
         market_input_count=len(market_rows),
-        top_liquid_count=len(top),
+        top_liquid_count=eligible_ranked_count,
         watchlist_count=len(manual_watchlist),
         exclusion_counts=excluded,
+        ranked_market_input_count=len(ranked_clean),
+        targeted_watchlist_input_count=len(targeted_clean),
+        ranked_rows_considered=ranked_rows_considered,
+        eligible_ranked_count=eligible_ranked_count,
+        ranked_target_count=limit,
+        ranked_completion_status=ranked_completion_status,
     )
 
 

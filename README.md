@@ -7,8 +7,9 @@ human operator reviewing Bybit USDT-perpetual opportunities.
 
 Lean Radar is the implemented default product: one small SQLite runtime, a
 strict confirmed-Bybit universe, market-led setups that do not require a
-catalyst, point-in-time outcomes, a six-page dashboard, and guarded Telegram
-attention routing. Start with the short operator loop:
+catalyst, point-in-time outcomes, bounded retention, a six-page dashboard,
+guarded Telegram attention routing, and an optional confirmation-gated macOS
+maintenance service. Start with the short operator loop:
 
 ```sh
 make lean-radar PYTHON=.venv/bin/python
@@ -19,9 +20,12 @@ make lean-radar-dashboard PYTHON=.venv/bin/python
 `lean-radar` is read-only and makes no provider call. `lean-radar-cycle` runs
 one cadence-gated scan, matures outcomes from retained observations, refreshes
 health, and builds the Telegram preview. It never sends Telegram or creates a
-trade/order/paper trade/RSI row. The scan crosses the CoinGecko boundary at most
-once, and only when the existing explicit authorization, catalog, and cadence
-checks already pass. Otherwise it returns exact safe guidance.
+trade/order/paper trade/RSI row. The scan may use up to four 250-row
+CoinGecko volume pages to find the first 200 eligible Bybit perps, plus up to
+two exact-ID batches for enabled watchlist assets missing from those pages. It
+stops early and crosses the boundary only when the existing explicit
+authorization, fresh catalog, and cadence checks already pass. Otherwise it
+returns exact safe guidance.
 
 Review notifications without sending:
 
@@ -45,10 +49,13 @@ remains visible and never creates direction.
 
 ### First-time setup
 
-Import one genuine locally supplied Bybit public instrument catalog. Lean Radar
-intersects it with the top 200 CoinGecko assets ranked by 24-hour volume plus
-the manual watchlist; a missing or ambiguous active USDT perpetual stays
-blocked/unverified. These setup commands make no provider call or Telegram send:
+Import one genuine locally supplied Bybit public instrument catalog. Refresh is
+recommended after 12 hours and the catalog becomes unusable for a provider call
+after 24 hours. Lean Radar walks CoinGecko volume order until it finds 200
+eligible active Bybit USDT perpetuals (or reports exhaustion/budget shortfall);
+the manual watchlist is additive and cannot distort that ranking. A missing or
+ambiguous contract stays blocked/unverified. These setup commands make no
+provider call or Telegram send:
 
 ```sh
 make lean-radar-bybit-universe-readiness PYTHON=.venv/bin/python
@@ -77,8 +84,34 @@ Scheduled events can raise risk/urgency and shorten an existing idea, but never
 create a long or short idea by themselves.
 
 The imports reject checked-in fixture/test/mock/replay paths and never infer
-authorization. The runtime database is ignored from git and contains no order,
-position, portfolio, account, or paper-trading tables. Event Alpha remains
+authorization. Every local path is descriptor-anchored and rejects symlink or
+replacement redirection. The single-file runtime database is ignored from git,
+creates no WAL/SHM pathname, applies fixed 3/14/180-day detail/history retention,
+and contains no order, position, portfolio, account, or paper-trading tables.
+
+Inspect retention and the optional scheduler without enabling anything:
+
+```sh
+make lean-radar-db-maintenance-dry-run PYTHON=.venv/bin/python
+make lean-radar-maintenance-readiness PYTHON=.venv/bin/python
+make lean-radar-maintenance-status PYTHON=.venv/bin/python
+```
+
+Applying compaction/retention or installing/removing the no-send LaunchAgent is
+always explicit:
+
+```sh
+CONFIRM=1 make lean-radar-db-maintenance PYTHON=.venv/bin/python
+CONFIRM=1 make lean-radar-maintenance-install PYTHON=.venv/bin/python
+CONFIRM=1 make lean-radar-maintenance-uninstall PYTHON=.venv/bin/python
+```
+
+The service plist contains no authorization, credential, or Telegram delivery
+configuration, and installation remains blocked until the selected runtime is
+initialized so scheduled attempts can persist their receipts. Run the focused
+product gate with `make lean-radar-verify PYTHON=.venv/bin/python`.
+
+Event Alpha remains
 optional Catalyst Context; Decision Radar and the Empirical Lab remain research
 infrastructure rather than default operator gates. See the
 [Lean Radar product contract](research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md).

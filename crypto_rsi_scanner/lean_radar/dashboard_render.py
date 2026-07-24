@@ -234,6 +234,73 @@ def _today(state: _LeanDashboardState) -> str:
         + "</div>",
         eyebrow="Point-in-time state",
     )
+    maintenance = (
+        health.get("maintenance")
+        if isinstance(health.get("maintenance"), Mapping)
+        else {}
+    )
+    database = (
+        health.get("database")
+        if isinstance(health.get("database"), Mapping)
+        else {}
+    )
+    maintenance_panel = ""
+    if maintenance:
+        if maintenance.get("installed_owned") is True:
+            maintenance_panel = _panel(
+                "Scheduled maintenance is installed",
+                '<div class="inline-facts">'
+                + _fact(
+                    "Last attempt",
+                    _when(maintenance.get("last_attempted_at"), state.loaded_at),
+                )
+                + _fact(
+                    "Last success",
+                    _when(maintenance.get("last_successful_at"), state.loaded_at),
+                )
+                + _fact(
+                    "Last result",
+                    _human(str(maintenance.get("last_attempt_status", "not run"))),
+                )
+                + _fact(
+                    "Next scheduled",
+                    _when(maintenance.get("next_scheduled_at"), state.loaded_at),
+                )
+                + _fact(
+                    "Database",
+                    _bytes(database.get("database_size_bytes")),
+                )
+                + "</div>",
+                eyebrow="Local no-send cycle",
+                tone="good",
+            )
+        else:
+            maintenance_panel = _panel(
+                "Scheduled maintenance is disabled",
+                "<p>Current data will age unless you run the manual cycle. "
+                "Installation remains an explicit operator decision.</p>"
+                + (
+                    "<p>Last cycle: "
+                    + escape(
+                        _human(
+                            str(maintenance.get("last_attempt_status", "not run"))
+                        )
+                    )
+                    + (
+                        " · "
+                        + escape(str(maintenance.get("last_skip_reason")))
+                        if maintenance.get("last_skip_reason")
+                        else ""
+                    )
+                    + "</p>"
+                )
+                + "<code>make lean-radar-readiness</code>"
+                + "<p class=\"fine-print\">Manual cycle: <code>make lean-radar-cycle</code>"
+                " · Install only after review: "
+                "<code>CONFIRM=1 make lean-radar-maintenance-install</code></p>",
+                eyebrow="No background activity",
+                tone="warn",
+            )
     scheduled = tuple(
         row
         for row in state.calendar_events
@@ -270,7 +337,14 @@ def _today(state: _LeanDashboardState) -> str:
             "Market observations remain available below.",
             action=("Review market", "/market"),
         )
-    return metrics + warning_panel + scan_strip + calendar_strip + sections
+    return (
+        metrics
+        + warning_panel
+        + maintenance_panel
+        + scan_strip
+        + calendar_strip
+        + sections
+    )
 
 
 def _ideas(state: _LeanDashboardState, query: Mapping[str, str]) -> str:
@@ -485,6 +559,21 @@ def _health(state: _LeanDashboardState) -> str:
         if health.get("last_provider_call_attempted") is True
         else "Not attempted"
     )
+    maintenance = (
+        health.get("maintenance")
+        if isinstance(health.get("maintenance"), Mapping)
+        else {}
+    )
+    database = (
+        health.get("database")
+        if isinstance(health.get("database"), Mapping)
+        else {}
+    )
+    bybit = (
+        health.get("bybit_universe")
+        if isinstance(health.get("bybit_universe"), Mapping)
+        else {}
+    )
     hero = f"""<section class="health-hero {_tone(status)}"><div>
 <p class="eyebrow">Current operator state</p><h2>{escape(_human(status))}</h2>
 <p>{'Core local state is ready.' if status == 'ready' else 'Review the items below before the next provider-backed scan.'}</p></div>
@@ -509,7 +598,37 @@ def _health(state: _LeanDashboardState) -> str:
             _health_card(
                 "Bybit universe",
                 f"{state.catalog_count} instruments",
-                f"Catalog {_when(state.catalog_observed_at, state.loaded_at)}",
+                f"{_human(str(bybit.get('freshness_status', 'unavailable')))} · "
+                f"catalog {_when(state.catalog_observed_at, state.loaded_at)}",
+            ),
+            _health_card(
+                "Scheduled maintenance",
+                (
+                    "Installed"
+                    if maintenance.get("installed_owned") is True
+                    else "Disabled"
+                ),
+                (
+                    f"Last { _when(maintenance.get('last_attempted_at'), state.loaded_at)}"
+                    f" · next { _when(maintenance.get('next_scheduled_at'), state.loaded_at)}"
+                ),
+            ),
+            _health_card(
+                "Last cycle",
+                _human(str(maintenance.get("last_attempt_status", "not run"))),
+                (
+                    str(maintenance.get("last_skip_reason"))
+                    if maintenance.get("last_skip_reason")
+                    else f"Last success {_when(maintenance.get('last_successful_at'), state.loaded_at)}"
+                ),
+            ),
+            _health_card(
+                "Local database",
+                _bytes(database.get("database_size_bytes")),
+                (
+                    f"{_nested(database, 'row_counts', 'market_snapshots', default=0)} "
+                    "snapshots · bounded retention"
+                ),
             ),
             _health_card(
                 "Calendar",
@@ -884,6 +1003,19 @@ def _number(value: object) -> str:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return "Unavailable"
     return f"{float(value):.1f}"
+
+
+def _bytes(value: object) -> str:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return "Unavailable"
+    amount = max(0.0, float(value))
+    if amount >= 1024**3:
+        return f"{amount / 1024**3:.2f} GiB"
+    if amount >= 1024**2:
+        return f"{amount / 1024**2:.1f} MiB"
+    if amount >= 1024:
+        return f"{amount / 1024:.1f} KiB"
+    return f"{amount:.0f} B"
 
 
 def _rsi(value: float | None) -> str:

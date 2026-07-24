@@ -177,6 +177,9 @@ def test_dashboard_loader_returns_closed_bounded_runtime_truth(tmp_path: Path) -
     assert state.health_status["current_authorization_status"] == "present"
     assert state.health_status["last_provider_call_attempted"] is False
     assert state.health_status["telegram_mode"] == "preview_only"
+    assert state.health_status["maintenance"]["installed_owned"] is False
+    assert state.health_status["database"]["status"] == "ready"
+    assert state.health_status["database"]["database_size_bytes"] > 0
 
 
 def test_system_health_surfaces_telegram_preview_without_claiming_delivery(
@@ -191,6 +194,10 @@ def test_system_health_surfaces_telegram_preview_without_claiming_delivery(
     assert "Preview only" in body
     assert "preview messages · no send on page load" in body
     assert "Telegram sends</span>" in body
+    assert "Scheduled maintenance" in body
+    assert "Disabled" in body
+    assert "Local database" in body
+    assert "bounded retention" in body
 
 
 @pytest.mark.parametrize(

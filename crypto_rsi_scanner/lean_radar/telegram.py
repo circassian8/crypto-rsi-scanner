@@ -100,7 +100,7 @@ def build_telegram_plan(
         if dashboard_url is not None
         else (environ or os.environ).get(DASHBOARD_URL_ENV, DEFAULT_DASHBOARD_URL)
     )
-    if not store.path.exists():
+    if not store.exists():
         return _empty_plan(
             now,
             status="setup_required",

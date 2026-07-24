@@ -3,17 +3,25 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
 from typing import Mapping, Sequence
+from uuid import uuid4
 
 from .bybit_universe import BybitUniverseError, load_catalog
 from .calendar import LeanCalendarError, load_calendar_snapshot
 from .config import LeanRadarConfigError, LeanRadarSettings, load_settings
 from .health import refresh_system_health
 from .market_data import MarketDataError, live_provider_authorized
+from .maintenance import (
+    LeanMaintenanceError,
+    install_maintenance,
+    maintenance_status,
+    uninstall_maintenance,
+)
 from .outcomes import LeanOutcomeError, refresh_outcomes
 from .safety import SAFETY_COUNTERS
 from .scan import run_scan, scan_readiness
@@ -46,6 +54,16 @@ def _parser() -> argparse.ArgumentParser:
     outcomes.add_argument("--evaluated-at", type=_time)
     health = subparsers.add_parser("health")
     health.add_argument("--evaluated-at", type=_time)
+    database_maintenance = subparsers.add_parser("db-maintenance")
+    database_maintenance.add_argument("--evaluated-at", type=_time)
+    database_maintenance.add_argument("--confirm", action="store_true")
+    database_maintenance.add_argument("--vacuum", action="store_true")
+    subparsers.add_parser("maintenance-readiness")
+    subparsers.add_parser("maintenance-status")
+    maintenance_install = subparsers.add_parser("maintenance-install")
+    maintenance_install.add_argument("--confirm", action="store_true")
+    maintenance_uninstall = subparsers.add_parser("maintenance-uninstall")
+    maintenance_uninstall.add_argument("--confirm", action="store_true")
     telegram_preview = subparsers.add_parser("telegram-preview")
     telegram_preview.add_argument("--evaluated-at", type=_time)
     telegram_readiness_parser = subparsers.add_parser("telegram-readiness")
@@ -80,6 +98,7 @@ def _parser() -> argparse.ArgumentParser:
     scan.add_argument("--markets", type=Path)
     scan.add_argument("--observed-at", type=_time)
     cycle = subparsers.add_parser("cycle")
+    cycle.set_defaults(trigger="manual")
     cycle.add_argument(
         "--source-mode",
         choices=("live_no_send", "imported_snapshot", "fixture"),
@@ -87,13 +106,22 @@ def _parser() -> argparse.ArgumentParser:
     )
     cycle.add_argument("--markets", type=Path)
     cycle.add_argument("--observed-at", type=_time)
+    scheduled_cycle = subparsers.add_parser("scheduled-cycle")
+    scheduled_cycle.set_defaults(
+        trigger="scheduled",
+        source_mode="live_no_send",
+        markets=None,
+        observed_at=None,
+    )
     return parser
 
 
 def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
     args = _parser().parse_args(argv)
     settings = load_settings()
-    store = LeanRadarStore(args.db or settings.db_path)
+    if args.db is not None:
+        settings = replace(settings, db_path=args.db)
+    store = LeanRadarStore(settings.db_path)
     if args.command == "telegram-preview":
         return 0, build_telegram_plan(store, evaluated_at=args.evaluated_at)
     if args.command == "telegram-readiness":
@@ -119,7 +147,49 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
             settings,
             evaluated_at=args.evaluated_at,
         )
-    if args.command == "cycle":
+    if args.command == "db-maintenance":
+        now = args.evaluated_at or datetime.now(timezone.utc)
+        payload = store.maintain_database(
+            evaluated_at=now,
+            apply=args.confirm,
+            vacuum=args.vacuum,
+        )
+        return 0, payload
+    if args.command in {"maintenance-readiness", "maintenance-status"}:
+        payload = maintenance_status(settings)
+        if args.command == "maintenance-readiness":
+            payload = {
+                **payload,
+                "status": (
+                    "ready"
+                    if payload.get("prepared") is True
+                    and payload.get("status") not in {
+                        "unsafe_path",
+                        "unowned_conflict",
+                        "setup_required",
+                        "unsupported_host",
+                        "preparation_blocked",
+                    }
+                    else "blocked"
+                ),
+                "service_state": payload.get("status"),
+            }
+        return 0, payload
+    if args.command == "maintenance-install":
+        payload = install_maintenance(settings, confirm=args.confirm)
+        return (
+            0
+            if payload.get("status") in {"installed", "already_installed"}
+            else 2
+        ), payload
+    if args.command == "maintenance-uninstall":
+        payload = uninstall_maintenance(settings, confirm=args.confirm)
+        return (
+            0
+            if payload.get("status") in {"disabled", "already_disabled"}
+            else 2
+        ), payload
+    if args.command in {"cycle", "scheduled-cycle"}:
         return _run_cycle(args, store, settings)
     if args.command == "calendar-readiness":
         calendar = store.calendar_status()
@@ -280,7 +350,9 @@ def render_summary(payload: Mapping[str, object]) -> str:
     if isinstance(catalog, Mapping):
         lines.append(
             "Bybit catalog: "
-            f"{catalog.get('status', 'unknown')} ({catalog.get('instrument_count', 0)} instruments)"
+            f"{catalog.get('status', 'unknown')} "
+            f"({catalog.get('instrument_count', 0)} instruments; "
+            f"{catalog.get('freshness_status', 'unavailable')})"
         )
     if "active_asset_count" in payload:
         lines.append(
@@ -308,6 +380,17 @@ def render_summary(payload: Mapping[str, object]) -> str:
         )
         lines.append(
             f"Telegram: {payload.get('telegram_mode', 'disabled_no_send')} · no send"
+        )
+    if "database_size_bytes_before" in payload:
+        lines.append(
+            "Database: "
+            f"{payload.get('database_size_bytes_before', 0)} bytes before · "
+            f"{payload.get('database_size_bytes_after', 0)} after"
+        )
+    if "installed_owned" in payload:
+        lines.append(
+            "Scheduled maintenance: "
+            + ("installed" if payload.get("installed_owned") else "disabled")
         )
     scan = payload.get("scan")
     if isinstance(scan, Mapping):
@@ -376,6 +459,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             forwarded.extend(("--markets", str(args.markets)))
         if args.observed_at:
             forwarded.extend(("--observed-at", args.observed_at.isoformat()))
+    elif args.command == "db-maintenance":
+        if args.evaluated_at:
+            forwarded.extend(("--evaluated-at", args.evaluated_at.isoformat()))
+        if args.confirm:
+            forwarded.append("--confirm")
+        if args.vacuum:
+            forwarded.append("--vacuum")
+    elif args.command in {"maintenance-install", "maintenance-uninstall"}:
+        if args.confirm:
+            forwarded.append("--confirm")
     elif args.command in {
         "outcomes",
         "health",
@@ -394,6 +487,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         LeanOutcomeError,
         LeanRadarConfigError,
         LeanRadarStoreError,
+        LeanMaintenanceError,
         LeanTelegramError,
         LeanUniverseError,
         MarketDataError,
@@ -456,6 +550,7 @@ def _run_cycle(
 ) -> tuple[int, dict[str, object]]:
     """Run one explicit no-send scan/outcome/health/preview sequence."""
 
+    attempted_at = datetime.now(timezone.utc)
     try:
         scan = _execute_scan(args, store, settings)
     except (LeanUniverseError, MarketDataError) as exc:
@@ -467,16 +562,19 @@ def _run_cycle(
             "provider_call_succeeded": False,
         }
     cycle_at = _cycle_clock(args, scan)
-    try:
-        outcomes = refresh_outcomes(store, evaluated_at=cycle_at)
-    except (LeanOutcomeError, LeanRadarStoreError, TypeError, ValueError):
-        outcomes = {
-            "status": "blocked",
-            "reason": "retained outcome evidence could not be refreshed",
-            "provider_call_attempted": False,
-            "telegram_send_attempted": False,
-        }
-    health = refresh_system_health(store, settings, evaluated_at=cycle_at)
+    embedded_outcomes = scan.get("outcomes")
+    if scan.get("status") == "complete" and isinstance(embedded_outcomes, Mapping):
+        outcomes = dict(embedded_outcomes)
+    else:
+        try:
+            outcomes = refresh_outcomes(store, evaluated_at=cycle_at)
+        except (LeanOutcomeError, LeanRadarStoreError, TypeError, ValueError):
+            outcomes = {
+                "status": "blocked",
+                "reason": "retained outcome evidence could not be refreshed",
+                "provider_call_attempted": False,
+                "telegram_send_attempted": False,
+            }
     try:
         preview = build_telegram_plan(store, evaluated_at=cycle_at)
     except LeanTelegramError:
@@ -501,11 +599,62 @@ def _run_cycle(
         status, code = "failed", 2
     else:
         status, code = "blocked", 2
+    runtime_exists = store.exists()
+    cycle_receipt_status = "runtime_missing"
+    cycle_id: str | None = None
+    if runtime_exists:
+        completed_at = datetime.now(timezone.utc)
+        receipt = {
+            "schema_version": "lean_cycle_receipt_v1",
+            "cycle_id": "lean-cycle-" + uuid4().hex,
+            "attempted_at": attempted_at.isoformat(),
+            "completed_at": completed_at.isoformat(),
+            "cycle_evaluated_at": cycle_at.isoformat(),
+            "trigger": str(getattr(args, "trigger", "manual")),
+            "status": status,
+            "source_mode": args.source_mode,
+            "scan_status": scan_status,
+            "scan_id": scan.get("scan_id"),
+            "skip_reason": _cycle_skip_reason(scan, status=status),
+            "provider_call_attempted": scan.get("provider_call_attempted") is True,
+            "provider_call_succeeded": scan.get("provider_call_succeeded") is True,
+            "snapshot_count": int(scan.get("snapshot_count", 0) or 0),
+            "idea_count": int(scan.get("idea_count", 0) or 0),
+            "telegram_preview_message_count": int(
+                preview.get("message_count", 0) or 0
+            ),
+            "telegram_send_attempted": False,
+            "no_send": True,
+            "research_only": True,
+            **SAFETY_COUNTERS,
+        }
+        try:
+            store.record_cycle_receipt(receipt)
+        except LeanRadarStoreError:
+            cycle_receipt_status = "failed"
+            status, code = "blocked", 2
+        else:
+            cycle_receipt_status = "recorded"
+            cycle_id = str(receipt["cycle_id"])
+    try:
+        health = refresh_system_health(store, settings, evaluated_at=cycle_at)
+        terminal_health_status = "recorded" if runtime_exists else "observed_no_write"
+    except LeanRadarStoreError:
+        health = {
+            "status": "unavailable",
+            "data_freshness": "unavailable",
+            "current_provider_call_eligibility": "unavailable",
+            "next_safe_command": "make lean-radar-health",
+        }
+        terminal_health_status = "failed"
+        status, code = "blocked", 2
     next_safe_command = (
         "make lean-radar-dashboard"
         if status == "complete"
-        else health.get("next_safe_command", "make lean-radar")
+        else str(health.get("next_safe_command", "make lean-radar"))
     )
+    if cycle_receipt_status == "failed":
+        next_safe_command = "make lean-radar-maintenance-status"
     payload = {
         "schema_version": "lean_operator_cycle_v1",
         "status": status,
@@ -517,6 +666,16 @@ def _run_cycle(
             "data_freshness": health.get("data_freshness", "unavailable"),
             "current_provider_call_eligibility": health.get(
                 "current_provider_call_eligibility", "unavailable"
+            ),
+            "maintenance_status": (
+                health.get("maintenance", {}).get("status")
+                if isinstance(health.get("maintenance"), Mapping)
+                else "unavailable"
+            ),
+            "database_size_bytes": (
+                health.get("database", {}).get("database_size_bytes")
+                if isinstance(health.get("database"), Mapping)
+                else None
             ),
         },
         "telegram_preview": {
@@ -531,12 +690,16 @@ def _run_cycle(
         "provider_call_attempted": scan.get("provider_call_attempted") is True,
         "provider_call_succeeded": scan.get("provider_call_succeeded") is True,
         "telegram_send_attempted": False,
-        "database_write_attempted": store.path.exists(),
+        "database_write_attempted": runtime_exists,
+        "cycle_receipt_status": cycle_receipt_status,
+        "terminal_health_status": terminal_health_status,
         "no_send": True,
         "research_only": True,
         "next_safe_command": next_safe_command,
         **SAFETY_COUNTERS,
     }
+    if cycle_id is not None:
+        payload["cycle_id"] = cycle_id
     return code, payload
 
 
@@ -561,6 +724,28 @@ def _scan_cycle_summary(scan: Mapping[str, object]) -> dict[str, object]:
         )
         if key in scan
     }
+
+
+def _cycle_skip_reason(
+    scan: Mapping[str, object],
+    *,
+    status: str,
+) -> str | None:
+    if status == "complete":
+        return None
+    reason = scan.get("reason")
+    if isinstance(reason, str) and reason.strip():
+        return reason.strip()[:500]
+    reasons = scan.get("reasons")
+    if isinstance(reasons, list):
+        bounded = [
+            value.strip()
+            for value in reasons
+            if isinstance(value, str) and value.strip()
+        ]
+        if bounded:
+            return "; ".join(bounded)[:500]
+    return "cycle did not reach a complete scan"
 
 
 def _outcome_cycle_summary(outcomes: Mapping[str, object]) -> dict[str, object]:

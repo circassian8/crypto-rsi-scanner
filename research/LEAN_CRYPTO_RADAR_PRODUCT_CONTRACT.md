@@ -1,10 +1,11 @@
 # Lean Crypto Radar V1 Product Contract
 
 Status: implemented default product. The universe/store, market scan,
-context-only calendar, automatic outcomes, bounded system health, six-page
-read-only dashboard, Telegram preview/dedupe/readiness/guarded delivery, shared
-current-scan gate, and explicit no-send operator cycle are implemented and
-release-verified on macOS with Python 3.13.
+context-only calendar, automatic outcomes, bounded system health and retention,
+six-page read-only dashboard, Telegram preview/dedupe/readiness/guarded
+delivery, descriptor-anchored local paths, an exact ranked acquisition plan,
+shared current-scan gate, explicit no-send operator cycle, and an uninstalled
+confirmation-gated macOS maintenance service are implemented.
 
 ## Product
 
@@ -24,9 +25,13 @@ for a market-led Lean Radar idea.
 - Instrument: active, non-prelisting, USDT-quoted and USDT-settled linear
   perpetuals.
 - Detection input: CoinGecko/public market data is acceptable.
-- Universe: top 200 assets ranked by 24-hour USD volume after shared hygiene,
-  intersected with a confirmed Bybit instrument catalog, plus a manual
-  watchlist subject to the same instrument check.
+- Universe: the first 200 eligible assets in CoinGecko 24-hour-USD-volume order
+  after shared hygiene and intersection with a fresh confirmed Bybit instrument
+  catalog. Acquisition reads at most four 250-row ranked pages and reports
+  target completion, true provider exhaustion, or page-budget shortfall.
+- Manual watchlist: additive and subject to the same exact identity/instrument
+  checks. IDs absent from the ranked pages use at most two 50-ID exact
+  CoinGecko requests; they never distort the ranked top 200.
 - Cadence: operator-configurable from 15 to 30 minutes; default 20 minutes.
 - Surfaces: dashboard and Telegram have equal product priority.
 - Runtime state: one small ignored SQLite database.
@@ -51,12 +56,22 @@ operator-priority summaries on a 0–100 scale, not win probabilities.
 ## Implemented scan contract
 
 One scan first proves the local Bybit catalog, source mode, explicit live
-authorization, and 15–30-minute cadence. Only then may the live path make one
-bounded CoinGecko `/coins/markets` request ordered by `volume_desc`. The request
-uses the endpoint's direct 1-hour, 24-hour, and 7-day percentage fields plus its
-7-day sparkline. Wilder-14 RSI is explicitly labeled as a calculation over
-untimestamped sparkline points. No 4-hour return is derived from array position;
-exact 4-hour context remains unavailable until timestamped bars are collected.
+authorization, and 15–30-minute cadence. Catalog refresh is recommended after
+12 hours and becomes a hard provider-call blocker after 24 hours; a fixture,
+future-invalid, incomplete, or stale catalog never supports a live scan.
+Only then may the live path make up to four bounded CoinGecko
+`/coins/markets` ranked-page requests ordered by `volume_desc`, stopping as soon
+as 200 eligible Bybit perps are found or the provider is exhausted. Up to two
+additional exact-ID batches may fill enabled manual-watchlist rows missing from
+the ranked pages. Every request is represented by bounded secret-safe telemetry;
+authorization is checked before the first request and is never created or
+persisted by the application.
+
+The response uses the endpoint's direct 1-hour, 24-hour, and 7-day percentage
+fields plus its 7-day sparkline. Wilder-14 RSI is explicitly labeled as a
+calculation over untimestamped sparkline points. No 4-hour return is derived
+from array position; exact 4-hour context remains unavailable until timestamped
+bars are collected.
 
 The store builds a rolling log-volume baseline after eight prior observations.
 Before that baseline is warm, a cross-sectional turnover z-score is labeled as
@@ -112,10 +127,12 @@ labels remain optional.
 `lean-radar-health` records a small local operator-health projection for the
 future dashboard. It separates the last provider attempt and result from the
 current authorization check and current call eligibility. It also reports the
-last/next scan, data freshness, Bybit catalog, CoinGecko status, calendar,
-outcomes, no-send state, Telegram mode, bounded errors, and the next safe
-command. The command makes no provider call and no send. A missing runtime
-database produces setup guidance without creating one.
+last/next scan, catalog age/hard expiry, CoinGecko status, calendar, outcomes,
+database size/row counts/retention, scheduled-maintenance state, last attempted
+and successful cycles, exact skip reason, next scheduled time, no-send state,
+Telegram mode, bounded errors, and the next safe command. The command makes no
+provider call and no send. A missing runtime database produces setup guidance
+without creating one.
 
 ## Implemented dashboard contract
 
@@ -128,7 +145,8 @@ calendar, catalyst, and outcome context visibly separate. Market renders the
 latest point per venue-confirmed asset, Calendar labels every event as
 context-only, Outcomes distinguishes pending, matured, and unresolved evidence,
 and System Health separates current authorization from historical provider
-results.
+results while showing catalog freshness, database growth, scheduled maintenance,
+last cycle outcome, and the next safe operator action.
 
 Every page shows whether its current scan came from a live no-send request, a
 genuine imported snapshot, or fixture data. A fixture can support offline smoke
@@ -190,12 +208,52 @@ on-chain, spread, macro, or LLM context are soft limitations. Missing spread
 caps confidence and urgency and normally prevents the strongest urgent route;
 it does not hide a useful watchlist/dashboard idea.
 
-## Runtime store
+## Runtime store and local-path boundary
 
 The single SQLite database may hold the Bybit catalog, manual watchlist, market
 snapshots and baselines, ideas, outcomes, calendar events, notification state,
-and health. It contains no orders, positions, portfolio, account data, or paper
-trades. The database and WAL/SHM files are ignored from git and review exports.
+health, and bounded cycle receipts. It contains no orders, positions, portfolio,
+account data, or paper trades.
+
+Every Lean-owned local input and runtime path is walked component by component
+from the filesystem root with descriptor-relative, no-follow operations.
+Symlinked parents or leaves, hard links, outside-root redirection, file or
+directory replacement, and lock replacement fail closed. SQLite never opens the
+operator pathname: the validated single-file image is deserialized in memory
+under one stable descriptor-opened lock and atomically republished through its
+held parent descriptor. No WAL/SHM pathname is created. The database is capped
+at 512 MiB.
+
+Retention is fixed and observable: full sparkline detail for 3 days, compact
+point-in-time snapshots for 14 days, ideas/outcomes for 180 days, old calendar
+history for 30 days, notification state for 90 days and at most 1,000 families,
+and at most 256 cycle receipts. A successful scan applies the policy
+transactionally. `make lean-radar-db-maintenance-dry-run` is read-only;
+`CONFIRM=1 make lean-radar-db-maintenance` applies the same policy, with
+`LEAN_RADAR_VACUUM=1` as a separately explicit option.
+
+## macOS maintenance
+
+The prepared user LaunchAgent runs the same `scheduled-cycle` no-send path at
+the configured 15–30-minute cadence. Its plist contains no credential,
+authorization, Telegram value, or delivery command. A scheduled cycle may call
+CoinGecko only if an authorization flag already exists in its inherited
+environment and catalog/cadence readiness also passes. Every terminal attempt
+gets one bounded SQLite receipt with trigger, status, skip reason, provider-call
+truth, counts, and zero side-effect counters.
+
+The service is deliberately uninstalled by default. Readiness and status are
+observational. Installation requires an initialized selected runtime so every
+scheduled invocation can persist its terminal receipt. Installation and
+removal are separate confirmation boundaries and affect only the exact owned
+plist/service:
+
+```sh
+make lean-radar-maintenance-readiness PYTHON=.venv/bin/python
+make lean-radar-maintenance-status PYTHON=.venv/bin/python
+CONFIRM=1 make lean-radar-maintenance-install PYTHON=.venv/bin/python
+CONFIRM=1 make lean-radar-maintenance-uninstall PYTHON=.venv/bin/python
+```
 
 ## Safety
 
@@ -223,10 +281,18 @@ make lean-radar-telegram-readiness PYTHON=.venv/bin/python
 
 The first command is read-only. The cycle performs one cadence-gated scan,
 refreshes outcomes and operator health, and builds the Telegram preview. It
-never invokes delivery. It may make at most one CoinGecko request only when the
-existing authorization, genuine catalog, and cadence rules already allow it.
+never invokes delivery. It may make at most four ranked-page and two exact-ID
+watchlist CoinGecko requests only when the existing authorization, fresh
+genuine catalog, and cadence rules already allow them. It stops early when the
+eligible target is reached and records one terminal cycle receipt.
 The lower-level `lean-radar-scan`, `lean-radar-outcomes`, and
 `lean-radar-health` commands remain available for focused diagnostics.
+
+The focused product gate is:
+
+```sh
+make lean-radar-verify PYTHON=.venv/bin/python
+```
 
 First-time setup remains explicit:
 
@@ -277,17 +343,25 @@ catalog import and genuine market-snapshot import reject checked-in fixture,
 test, mock, or replay paths. The legacy Decision Radar commands remain
 available for research operations but are outside this default path.
 
-## V1 release evidence
+## Operational Pilot V1 release evidence
 
-The 2026-07-23 release gate passed all 77 focused Lean Radar tests, the bounded
-artifact-heavy performance guard (14 tests in 0.16 seconds), the export parent-
-symlink/TOCTOU regression, compileall, contract JSON validation, all focused
-operator readiness/smoke commands, and architecture cleanliness. The supported
-Python 3.13 `verify-fast` gate passed 3,992 package tests plus alert/backtest/
-score smokes. The final `make verify` passed 1,547 standalone compatibility
-tests, the same 3,992 package tests, and every release smoke. Dashboard socket
-tests used their required local loopback permission. No live provider call,
-Telegram send, trade, order, paper trade, normal RSI write, or
+The 2026-07-24 release gate passed all 101 focused Lean Radar tests and the
+143-test `make lean-radar-verify` product gate, including shared indicator
+coverage and all six dashboard pages. It also passed the export parent-symlink/
+TOCTOU regression, compileall, contract JSON validation, exact readiness and
+maintenance dry-runs, and architecture cleanliness; quantitative file-size
+observations remain advisory by policy. The supported Python 3.13
+`verify-fast` gate passed 4,016 package tests plus alert/backtest/score smokes.
+The final `make verify` passed 1,547 standalone compatibility tests, the same
+4,016 package tests, and every release smoke. Dashboard socket tests used their
+required local loopback permission.
+
+The first real no-send pilot readiness check found an existing CoinGecko
+authorization flag but no genuine current Bybit instruments catalog. It
+therefore stopped at `catalog_unavailable`, made no provider call, created no
+runtime database, and did not install maintenance. The exact next boundary is
+the confirmed import of a fresh operator-supplied Bybit `instruments-info`
+snapshot. No Telegram send, trade, order, paper trade, normal RSI write, or
 Event Alpha-created `TRIGGERED_FADE` occurred during this release work.
 
 ## Deliberately not included

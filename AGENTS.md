@@ -184,8 +184,11 @@ require a known catalyst to surface a liquid, timely market-led review item.
 - `make lean-radar` is the default observational entrypoint.
   `make lean-radar-cycle` is the normal explicit no-send operating cycle: it
   runs the scan, refreshes outcomes and health, and builds the Telegram preview.
-  It performs at most one already-authorized, cadence-eligible CoinGecko
-  market-list call ordered by 24-hour volume and never invokes delivery.
+  It performs at most four already-authorized, cadence-eligible CoinGecko
+  market-list pages ordered by 24-hour volume until the first 200 eligible
+  active Bybit perps are found, the provider is exhausted, or the page budget
+  is reached. At most two additional exact-ID batches may fill enabled
+  watchlist assets missing from those pages. It never invokes delivery.
   `make lean-radar-scan` remains the lower-level scan-only diagnostic. Genuine
   imported snapshots require
   an explicit aware observation clock and reject fixture/test/mock/replay paths.
@@ -194,6 +197,20 @@ require a known catalyst to surface a liquid, timely market-led review item.
   4h return from sparkline array position. The first eight observations are
   baseline warm-up, not fabricated history. Missing spread caps confidence and
   urgency rather than becoming an estimate.
+- Every Lean local path is walked component-by-component with descriptor-
+  relative no-follow operations. Symlinked parents/leaves, hard links, outside
+  redirection, and file/directory/lock replacement fail closed. The SQLite
+  pathname is never passed to SQLite: one validated single-file image is held
+  under a stable descriptor-opened lock, deserialized in memory, and atomically
+  republished through its held parent. No WAL/SHM pathname is created.
+- A Bybit catalog refresh is recommended after 12 hours and becomes unusable
+  for non-fixture scans after 24 hours. Incomplete, future-invalid, stale, or
+  fixture catalogs cannot cross a live market-provider boundary.
+- Lean runtime retention keeps full snapshot detail for 3 days, compact
+  snapshots for 14 days, ideas/outcomes for 180 days, old calendar rows for 30
+  days, notification state for 90 days/1,000 families, and 256 cycle receipts.
+  Successful scans apply it transactionally. Dry-run is read-only; explicit
+  maintenance and optional VACUUM require confirmation.
 - Lean calendar readiness is read-only. Genuine local import is `CONFIRM=1`,
   rejects fixture/test/mock/replay paths, fingerprints the exact source bytes,
   and stores only validated events in the same SQLite database. Macro events are
@@ -209,7 +226,15 @@ require a known catalyst to surface a liquid, timely market-led review item.
   descriptive result bands cannot feed detector thresholds, scores, or routes.
   `make lean-radar-health` persists bounded local operator truth without a
   provider call or send and keeps current authorization/call eligibility
-  separate from the latest historical provider attempt/result.
+  separate from the latest historical provider attempt/result. It also reports
+  catalog expiry, database size/rows/retention, maintenance state, last
+  attempted/successful cycle, skip reason, and next scheduled time.
+- Lean macOS maintenance is prepared but uninstalled by default. Readiness and
+  status are observational. Install/uninstall require `CONFIRM=1`, affect only
+  the exact owned LaunchAgent, run the same `scheduled-cycle` no-send path, and
+  never embed authorization, credentials, or Telegram delivery configuration.
+  Installation is blocked until the selected runtime is initialized so every
+  scheduled invocation can write its terminal bounded receipt.
 - `make lean-radar-dashboard` serves the one SQLite runtime read-only on
   `127.0.0.1:8766` with exactly Today, Ideas, Market, Calendar, Outcomes, and
   System Health as primary pages. Every page labels live no-send, genuine

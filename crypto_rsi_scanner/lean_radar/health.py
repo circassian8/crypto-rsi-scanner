@@ -3,14 +3,23 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Mapping
 
 from .config import LeanRadarSettings
 from .freshness import market_scan_freshness
 from .market_data import LIVE_AUTH_ENV, live_provider_authorized
+from .maintenance import (
+    LeanMaintenanceError,
+    maintenance_status,
+    next_scheduled_time,
+)
 from .safety import SAFETY_COUNTERS
 from .store import LeanRadarStore, LeanRadarStoreError
 from .telegram import LeanTelegramError, telegram_readiness
+
+
+MAX_HEALTH_CYCLE_RECEIPTS = 32
 
 
 def refresh_system_health(
@@ -19,6 +28,7 @@ def refresh_system_health(
     *,
     environ: Mapping[str, str] | None = None,
     evaluated_at: datetime | None = None,
+    maintenance_plist_path: Path | None = None,
 ) -> dict[str, object]:
     """Inspect local state, persist it when possible, and make no provider call."""
 
@@ -27,7 +37,24 @@ def refresh_system_health(
         raise LeanRadarStoreError("system health evaluation time must be timezone-aware")
     now = now.astimezone(timezone.utc)
     authorized = live_provider_authorized(environ)
-    if not store.path.exists():
+    if not store.exists():
+        try:
+            maintenance = maintenance_status(
+                settings,
+                evaluated_at=now,
+                **(
+                    {"plist_path": maintenance_plist_path}
+                    if maintenance_plist_path is not None
+                    else {}
+                ),
+            )
+        except LeanMaintenanceError:
+            maintenance = {
+                "status": "unavailable",
+                "installed": False,
+                "installed_owned": False,
+                "enabled": False,
+            }
         return {
             "status": "setup_required",
             "component": "operator",
@@ -40,6 +67,11 @@ def refresh_system_health(
             "current_provider_call_eligibility": "catalog_missing",
             "no_send": True,
             "telegram_mode": "disabled_no_send",
+            "maintenance": maintenance,
+            "database": {
+                "status": "missing",
+                "database_size_bytes": 0,
+            },
             "provider_call_attempted": False,
             "telegram_send_attempted": False,
             "errors": ["Confirmed Bybit USDT-perpetual catalog is missing"],
@@ -52,7 +84,73 @@ def refresh_system_health(
         }
 
     errors: list[str] = []
-    catalog = store.catalog_status()
+    catalog = store.catalog_status(evaluated_at=now)
+    database = store.database_status(evaluated_at=now)
+    receipts = store.list_cycle_receipts(limit=MAX_HEALTH_CYCLE_RECEIPTS)
+    last_cycle = receipts[0] if receipts else None
+    last_successful_cycle = next(
+        (row for row in receipts if row.get("status") == "complete"),
+        None,
+    )
+    try:
+        maintenance = maintenance_status(
+            settings,
+            evaluated_at=now,
+            **(
+                {"plist_path": maintenance_plist_path}
+                if maintenance_plist_path is not None
+                else {}
+            ),
+        )
+        maintenance = {
+            **maintenance,
+            "last_attempted_at": (
+                last_cycle.get("attempted_at") if last_cycle else None
+            ),
+            "last_attempt_status": (
+                last_cycle.get("status") if last_cycle else "not_run"
+            ),
+            "last_skip_reason": (
+                last_cycle.get("skip_reason") if last_cycle else None
+            ),
+            "last_successful_at": (
+                last_successful_cycle.get("completed_at")
+                if last_successful_cycle
+                else None
+            ),
+            "next_scheduled_at": next_scheduled_time(
+                last_attempted_at=(
+                    last_cycle.get("attempted_at")  # type: ignore[arg-type]
+                    if last_cycle
+                    and isinstance(last_cycle.get("attempted_at"), str)
+                    else None
+                ),
+                cadence_minutes=settings.cadence_minutes,
+            ),
+        }
+    except LeanMaintenanceError:
+        maintenance = {
+            "status": "unavailable",
+            "installed": False,
+            "installed_owned": False,
+            "enabled": False,
+            "last_attempted_at": (
+                last_cycle.get("attempted_at") if last_cycle else None
+            ),
+            "last_attempt_status": (
+                last_cycle.get("status") if last_cycle else "not_run"
+            ),
+            "last_skip_reason": (
+                last_cycle.get("skip_reason") if last_cycle else None
+            ),
+            "last_successful_at": (
+                last_successful_cycle.get("completed_at")
+                if last_successful_cycle
+                else None
+            ),
+            "next_scheduled_at": None,
+        }
+        errors.append("Scheduled maintenance state could not be validated")
     try:
         calendar = store.calendar_status(evaluated_at=now)
     except (LeanRadarStoreError, TypeError, ValueError):
@@ -99,7 +197,10 @@ def refresh_system_health(
             raise LeanRadarStoreError("stored scan freshness is invalid") from exc
         freshness = "fresh" if scan_freshness == "current" else scan_freshness
     if catalog.get("status") != "ready":
-        errors.append("Confirmed Bybit USDT-perpetual catalog is not ready")
+        if catalog.get("freshness_status") == "stale":
+            errors.append("Confirmed Bybit USDT-perpetual catalog is stale")
+        else:
+            errors.append("Confirmed Bybit USDT-perpetual catalog is not ready")
     if scan is None:
         errors.append("No completed or attempted Lean Radar scan is recorded")
     elif scan.get("status") not in {"complete", "ready"}:
@@ -110,6 +211,12 @@ def refresh_system_health(
         errors.append(f"Current provider authorization is absent ({LIVE_AUTH_ENV})")
     if outcomes and outcomes.get("status") == "blocked":
         errors.append("Outcome evidence is blocked")
+    if maintenance.get("installed_owned") is not True:
+        errors.append(
+            "Scheduled maintenance is disabled; run manual cycles or explicitly install it"
+        )
+    if database.get("status") != "ready":
+        errors.append("Lean Radar database requires maintenance attention")
 
     cadence_eligible = next_scan_at is None or now >= _time(next_scan_at)
     eligibility = _provider_eligibility(
@@ -142,10 +249,16 @@ def refresh_system_health(
         "current_provider_call_eligibility": eligibility,
         "bybit_universe": {
             "status": catalog.get("status"),
+            "freshness_status": catalog.get("freshness_status"),
+            "age_seconds": catalog.get("age_seconds"),
+            "recommended_refresh_at": catalog.get("recommended_refresh_at"),
+            "maximum_usable_until": catalog.get("maximum_usable_until"),
             "instrument_count": catalog.get("instrument_count", 0),
             "source_mode": catalog.get("source_mode"),
             "source_observed_at": catalog.get("source_observed_at"),
         },
+        "database": database,
+        "maintenance": maintenance,
         "coin_gecko": {
             "current_authorization_status": "present" if authorized else "absent",
             "last_call_attempted": last_provider_attempted,
@@ -222,7 +335,11 @@ def _provider_eligibility(
     cadence_eligible: bool,
 ) -> str:
     if catalog.get("status") != "ready":
-        return "catalog_missing"
+        return (
+            "catalog_stale"
+            if catalog.get("freshness_status") == "stale"
+            else "catalog_unavailable"
+        )
     if catalog.get("source_mode") == "fixture":
         return "fixture_catalog_blocked"
     if not authorized:
@@ -239,6 +356,11 @@ def _next_safe_command(
     cadence_eligible: bool,
 ) -> str:
     if catalog.get("status") != "ready":
+        if catalog.get("freshness_status") == "stale":
+            return (
+                "refresh the complete Bybit catalog, then run "
+                "make lean-radar-readiness"
+            )
         return (
             "CONFIRM=1 make lean-radar-bybit-universe-import "
             "LEAN_RADAR_BYBIT_CATALOG=/absolute/path/to/instruments-info.json"

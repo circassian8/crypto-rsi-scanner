@@ -11,15 +11,30 @@
     "telegram_preview": "implemented",
     "calendar": "implemented",
     "outcomes": "implemented",
-    "system_health": "implemented"
+    "system_health": "implemented",
+    "descriptor_anchored_local_paths": "implemented",
+    "exact_ranked_acquisition": "implemented",
+    "bounded_database_retention": "implemented",
+    "confirmation_gated_macos_maintenance": "implemented_uninstalled"
   },
   "venue": "bybit",
   "instrument_type": "usdt_perpetual",
   "universe": {
     "top_liquid_limit": 200,
     "liquidity_rank_basis": "coingecko_total_volume_usd_24h_desc_after_shared_hygiene",
+    "rank_definition": "first_200_eligible_assets_after_active_bybit_usdt_perpetual_intersection",
+    "ranked_page_size": 250,
+    "maximum_ranked_pages": 4,
+    "stops_on": [
+      "200_eligible_assets",
+      "provider_exhaustion",
+      "ranked_page_budget"
+    ],
     "requires_confirmed_active_bybit_instrument": true,
     "manual_watchlist_enabled": true,
+    "manual_watchlist_policy": "additive_not_rank_distorting",
+    "manual_watchlist_targeted_exact_id_batch_size": 50,
+    "manual_watchlist_targeted_id_limit": 100,
     "unverified_watchlist_policy": "visible_blocked_unverified"
   },
   "cadence_minutes": {
@@ -35,17 +50,23 @@
     "cycle_stages": [
       "cadence_gated_market_scan",
       "point_in_time_outcome_refresh",
-      "operator_health_refresh",
-      "telegram_preview"
+      "telegram_preview",
+      "bounded_cycle_receipt",
+      "terminal_operator_health_refresh"
     ],
-    "maximum_provider_calls": 1,
+    "maximum_provider_calls": 6,
+    "maximum_ranked_provider_calls": 4,
+    "maximum_targeted_watchlist_provider_calls": 2,
     "requires_existing_provider_authorization": true,
     "telegram_delivery_invoked": false
   },
   "market_scan": {
     "live_provider": "coingecko_coins_markets",
     "live_order": "volume_desc",
-    "live_request_bound": 1,
+    "live_request_bound": 6,
+    "ranked_request_bound": 4,
+    "targeted_watchlist_request_bound": 2,
+    "request_ledger_secret_safe": true,
     "direct_return_fields": [
       "1h_percent_points",
       "24h_percent_points",
@@ -131,6 +152,12 @@
       "telegram_mode",
       "telegram_preview_and_send_readiness",
       "last_telegram_delivery",
+      "bybit_catalog_freshness_and_expiry",
+      "database_size_rows_and_retention",
+      "scheduled_maintenance_state",
+      "last_attempted_and_successful_cycle",
+      "cycle_skip_reason",
+      "next_scheduled_cycle",
       "bounded_errors",
       "next_safe_command"
     ],
@@ -244,6 +271,24 @@
   "runtime_store": {
     "type": "sqlite",
     "database_count": 1,
+    "descriptor_anchored_component_walk": true,
+    "symlink_and_replacement_fail_closed": true,
+    "sqlite_pathname_open": false,
+    "serialized_single_file_image": true,
+    "wal_or_shm_files": false,
+    "maximum_database_bytes": 536870912,
+    "retention": {
+      "full_snapshot_detail_days": 3,
+      "snapshot_history_days": 14,
+      "idea_outcome_days": 180,
+      "calendar_history_days": 30,
+      "notification_state_days": 90,
+      "maximum_notification_states": 1000,
+      "maximum_cycle_receipts": 256,
+      "automatic_after_successful_scan": true,
+      "explicit_dry_run_command": "make lean-radar-db-maintenance-dry-run",
+      "explicit_apply_command": "CONFIRM=1 make lean-radar-db-maintenance"
+    },
     "allowed_domains": [
       "bybit_instruments",
       "manual_watchlist",
@@ -254,6 +299,7 @@
       "calendar_events",
       "notification_state",
       "system_health",
+      "cycle_receipts",
       "optional_feedback"
     ],
     "forbidden_domains": [
@@ -263,6 +309,29 @@
       "account_data",
       "paper_trades"
     ]
+  },
+  "bybit_catalog_freshness": {
+    "recommended_refresh_hours": 12,
+    "maximum_usable_age_hours": 24,
+    "stale_catalog_may_call_market_provider": false,
+    "fixture_catalog_may_support_live_scan": false,
+    "readiness_provider_call": false,
+    "genuine_local_import_confirmation_required": true,
+    "direct_live_capture": "not_enabled"
+  },
+  "macos_maintenance": {
+    "service": "launchd_user_agent",
+    "status": "prepared_disabled",
+    "scheduled_command": "scheduled-cycle",
+    "default_install_state": "uninstalled",
+    "requires_initialized_selected_runtime": true,
+    "contains_credentials_or_authorization": false,
+    "telegram_delivery_invoked": false,
+    "provider_call_requires_inherited_existing_explicit_authorization": true,
+    "install_command": "CONFIRM=1 make lean-radar-maintenance-install",
+    "disable_command": "CONFIRM=1 make lean-radar-maintenance-uninstall",
+    "readiness_command": "make lean-radar-maintenance-readiness",
+    "status_command": "make lean-radar-maintenance-status"
   },
   "safety": {
     "research_only": true,
@@ -278,17 +347,28 @@
     "fabricated_missing_data": false
   },
   "release_verification": {
-    "verified_at": "2026-07-23",
+    "verified_at": "2026-07-24",
     "platform": "macos",
     "python": "3.13.5",
-    "focused_lean_tests_passed": 77,
-    "artifact_heavy_performance_tests_passed": 14,
-    "verify_fast_package_tests_passed": 3992,
+    "focused_lean_tests_passed": 101,
+    "lean_product_gate_tests_passed": 143,
+    "verify_fast_package_tests_passed": 4016,
     "full_standalone_tests_passed": 1547,
-    "full_package_tests_passed": 3992,
+    "full_package_tests_passed": 4016,
     "alert_backtest_score_smokes_passed": true,
     "architecture_clean": true,
+    "quantitative_size_observations": "advisory_only",
     "export_toctou_regression_passed": true,
+    "pilot_readiness": {
+      "status": "setup_required",
+      "current_provider_call_eligibility": "catalog_unavailable",
+      "coingecko_authorization_present": true,
+      "genuine_bybit_catalog_present": false,
+      "provider_call_attempted": false,
+      "runtime_database_created": false,
+      "maintenance_installed": false,
+      "next_safe_command": "CONFIRM=1 make lean-radar-bybit-universe-import LEAN_RADAR_BYBIT_CATALOG=/absolute/path/to/instruments-info.json"
+    },
     "live_provider_calls": 0,
     "telegram_sends": 0,
     "trades_orders_paper_rsi_or_triggered_fade_created": 0

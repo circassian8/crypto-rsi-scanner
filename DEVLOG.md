@@ -17,6 +17,57 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-24 — Deliver Lean Crypto Radar Operational Pilot V1 · Codex
+**Why:** The implemented Lean product still needed production-grade local path
+integrity, the exact claimed top-200 eligible universe, bounded runtime growth,
+and an operator-safe way to maintain cadence before its first genuine no-send
+cycle.
+**Changes:**
+- Added one descriptor-relative, no-follow path boundary for every Lean import,
+  runtime, dashboard-startup, and maintenance path. Parent/intermediate/final
+  symlinks, hard links, outside redirection, and file/directory/lock replacement
+  fail closed. SQLite now consumes a validated in-memory serialization under a
+  stable descriptor-opened lock and atomically publishes one bounded image
+  without WAL/SHM pathnames.
+- Changed live acquisition to walk at most four 250-row CoinGecko volume pages
+  until it finds the first 200 shared-hygiene assets with exact active Bybit
+  USDT-linear perpetuals, provider exhaustion, or the page budget. An enabled
+  watchlist is additive through at most two 50-ID exact requests and cannot
+  change ranked membership. Request telemetry distinguishes target completion,
+  exhaustion, and bounded shortfall.
+- Added explicit Bybit catalog status with 12-hour refresh guidance and a
+  24-hour hard live-use expiry. Fixture, stale, missing, incomplete, and
+  future-invalid catalogs cannot cross the provider boundary.
+- Added schema-v2 cycle receipts; fixed 3/14/180-day detail/history retention;
+  30-day calendar, 90-day/1,000-family notification, 256-receipt, and 512-MiB
+  bounds; read-only maintenance preview; and separately confirmed retention/
+  VACUUM.
+- Added a prepared-but-uninstalled macOS LaunchAgent that runs the same no-send
+  cycle, contains no authorization/credentials/Telegram delivery settings, and
+  can mutate only its exact owned service after `CONFIRM=1`. Installation is
+  blocked until the selected runtime can persist receipts. Today and System
+  Health now expose catalog, database, retention, maintenance, last attempt/
+  success/skip, and exact next-action truth without GET/HEAD side effects.
+- Added `make lean-radar-verify`, adversarial path/database races, exact
+  pagination/watchlist, catalog-expiry, retention, receipt, scheduler, and
+  dashboard regressions. Updated the product contract, README, working
+  agreement, decisions, roadmap, and static architecture reports.
+**Verify:** `make lean-radar-verify` passes 143 tests and all six dashboard
+pages; the export parent-symlink/TOCTOU regression, compileall, JSON validation,
+`git diff --check`, exact readiness/maintenance/retention dry-runs, and
+architecture cleanliness pass. `make verify-fast` passes 4,016 package tests
+plus alert/backtest/score smokes in 185 seconds. Final `make verify` passes
+1,547 standalone and 4,016 package tests plus every smoke. The first restricted
+`verify-fast` attempt had one loopback bind denied by the workspace sandbox;
+the complete gate and final release gate pass with the required local-socket
+permission.
+**Notes/risks:** Real readiness found the existing CoinGecko authorization but
+no genuine Bybit instruments catalog, so eligibility is `catalog_unavailable`.
+No live call or runtime database was created, and maintenance remains
+uninstalled. The next human boundary is a confirmed import of a fresh genuine
+catalog. No Telegram send, trade, order, paper trade, normal RSI write, or
+Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-23 — Keep the extracted-archive gate on its selected Python · Codex
 **Why:** Exact source-with-artifacts verification found one legacy Protocol-v2
 test that ignored the interpreter selected for the suite and forced a bare
