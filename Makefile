@@ -738,7 +738,7 @@ export-src:
 	git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD
 
 export-src-with-artifacts:
-	python3 scripts/export_source_with_artifacts.py
+	$(PYTHON) scripts/export_source_with_artifacts.py
 
 export-src-with-artifacts-smoke:
 	$(PYTHON) scripts/export_source_with_artifacts.py

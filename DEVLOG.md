@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-24 — Honor the selected Python in the review export · Codex
+**Why:** The post-push Operational Pilot review export exposed that
+`export-src-with-artifacts` still forced bare Homebrew `python3`, so it failed
+on a missing project dependency even when the caller explicitly selected the
+supported `.venv` Python 3.13 runtime.
+**Changes:** The main fixed review-export target now uses `$(PYTHON)`, matching
+its smoke target and the rest of the release workflow. Its Make regression
+passes a sentinel interpreter path and proves the target preserves it.
+**Verify:** The focused Make-target regression passes, `git diff --check`
+passes, and `make export-src-with-artifacts PYTHON=.venv/bin/python` completes
+with secret/path/inventory validation. The fixed archive is rebuilt again from
+the pushed commit.
+**Notes/risks:** Release-tool selection only. No product, provider,
+authorization, send, trading, paper, RSI, or runtime-state behavior changed.
+
 ## 2026-07-24 — Deliver Lean Crypto Radar Operational Pilot V1 · Codex
 **Why:** The implemented Lean product still needed production-grade local path
 integrity, the exact claimed top-200 eligible universe, bounded runtime growth,

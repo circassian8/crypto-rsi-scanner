@@ -320,7 +320,6 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "export-src:" in makefile
     assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in makefile
     assert "export-src-with-artifacts:" in makefile
-    assert "python3 scripts/export_source_with_artifacts.py" in makefile
     assert "export-src-with-artifacts-smoke:" in makefile
     assert "$(PYTHON) scripts/export_source_with_artifacts.py" in makefile
     assert "event-fade-check-review-template:" in makefile
@@ -345,13 +344,21 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in export_dry.stdout
 
     export_artifacts_dry = subprocess.run(
-        ["make", "-n", "export-src-with-artifacts"],
+        [
+            "make",
+            "-n",
+            "export-src-with-artifacts",
+            "PYTHON=/selected/project/python",
+        ],
         cwd=root,
         check=True,
         text=True,
         capture_output=True,
     )
-    assert "python3 scripts/export_source_with_artifacts.py" in export_artifacts_dry.stdout
+    assert (
+        "/selected/project/python scripts/export_source_with_artifacts.py"
+        in export_artifacts_dry.stdout
+    )
 
     spec = importlib.util.spec_from_file_location(
         "export_source_with_artifacts",
