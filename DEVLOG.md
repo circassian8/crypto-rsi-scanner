@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-29 — Complete the first genuine Lean Radar cycle · Codex
+**Why:** Operational Pilot V1 needed one real, bounded, no-send run before any
+algorithm or scheduling work could be justified. The operator enabled a
+permitted US VPN route and explicitly authorized the local Bybit boundary.
+**Changes:** Captured one official Bybit active-linear catalog response with no
+retry, verified `retCode=0`, an empty pagination cursor, 767 source rows, a
+fresh provider clock, and SHA-256
+`c14d603e53ae761d63425b264e0fbafc4bb1af7b650e40c773f6872f699b18d3`;
+663 exact active USDT perpetuals passed strict normalization and were imported
+into the ignored Lean runtime. The first CoinGecko attempt failed closed and
+remains recorded. After the exact cadence boundary, the retry completed from
+two HTTP-200 ranked pages: 500 rows yielded the exact 200 eligible-Bybit target,
+65 current ideas, 260 atomic 1h/4h/24h/3d pending outcomes, and a six-message
+Telegram preview covering 18 due items. Started the real read-only dashboard on
+`127.0.0.1:8766`; Today, Ideas, Market, Calendar, Outcomes, and System Health
+all return HTTP 200 against the genuine runtime.
+**Verify:** `make lean-radar-verify` passes 145 tests and the six-page fixture
+smoke; `make verify-fast` passes 4,018 tests plus alert/backtest/score smokes in
+184.83 seconds; architecture cleanliness passes; actual dashboard probes pass
+6/6. Runtime reconciliation reports two provider calls, both HTTP 200, target
+reached, 200 snapshots, 65 ideas, 260 pending outcomes, a 1,613,824-byte
+database, and zero sends, trades, orders, positions, paper trades, normal RSI
+writes, or `TRIGGERED_FADE`.
+**Notes/risks:** This is baseline observation one; the first eight observations
+remain warm-up evidence. Maintenance remains intentionally disabled, calendar
+context remains empty, Telegram delivery was not invoked, and the next eligible
+scan is `2026-07-29T12:00:45.206903+00:00`.
+
 ## 2026-07-29 — Preserve Lean live-provider failure telemetry · Codex
 **Why:** The first genuine Lean no-send cycle failed after crossing the bounded
 CoinGecko boundary, but the persisted scan receipt collapsed the cause to a

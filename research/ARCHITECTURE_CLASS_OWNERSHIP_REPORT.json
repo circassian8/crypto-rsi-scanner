@@ -1635,9 +1635,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11613,
+  "function_count": 11615,
   "function_line_limit": 150,
-  "functions_over_150_lines": 44,
+  "functions_over_150_lines": 45,
   "functions_over_limit": [
     {
       "function_name": "_validate_closed_projection",
@@ -1969,15 +1969,23 @@
     },
     {
       "function_name": "fetch_live_market_rows",
-      "line_count": 200,
+      "line_count": 229,
       "module": "crypto_rsi_scanner.lean_radar.market_data",
       "public": true,
       "qualname": "fetch_live_market_rows",
       "source_path": "crypto_rsi_scanner/lean_radar/market_data.py"
     },
     {
+      "function_name": "collect",
+      "line_count": 176,
+      "module": "crypto_rsi_scanner.lean_radar.market_data",
+      "public": true,
+      "qualname": "fetch_live_market_rows.collect",
+      "source_path": "crypto_rsi_scanner/lean_radar/market_data.py"
+    },
+    {
       "function_name": "run_scan",
-      "line_count": 263,
+      "line_count": 269,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -1992,8 +2000,8 @@
       "source_path": "crypto_rsi_scanner/lean_radar/universe.py"
     }
   ],
-  "functions_over_limit_count": 44,
-  "generated_at": "2026-07-24T12:42:06.109649+00:00",
+  "functions_over_limit_count": 45,
+  "generated_at": "2026-07-29T11:31:07.267367+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3753,7 +3761,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 44,
+  "production_functions_over_limit": 45,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -4085,15 +4093,23 @@
     },
     {
       "function_name": "fetch_live_market_rows",
-      "line_count": 200,
+      "line_count": 229,
       "module": "crypto_rsi_scanner.lean_radar.market_data",
       "public": true,
       "qualname": "fetch_live_market_rows",
       "source_path": "crypto_rsi_scanner/lean_radar/market_data.py"
     },
     {
+      "function_name": "collect",
+      "line_count": 176,
+      "module": "crypto_rsi_scanner.lean_radar.market_data",
+      "public": true,
+      "qualname": "fetch_live_market_rows.collect",
+      "source_path": "crypto_rsi_scanner/lean_radar/market_data.py"
+    },
+    {
       "function_name": "run_scan",
-      "line_count": 263,
+      "line_count": 269,
       "module": "crypto_rsi_scanner.lean_radar.scan",
       "public": true,
       "qualname": "run_scan",
@@ -4655,7 +4671,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 44,
+      "functions_over_150_lines": 45,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -4988,7 +5004,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 44,
+    "functions_over_150_lines": 45,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,

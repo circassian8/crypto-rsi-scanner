@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-24T12:42:06.109649+00:00`
+- generated_at: `2026-07-29T11:31:07.267367+00:00`
 - public_class_count: `533`
 - classes_over_limit_count: `9`
-- functions_over_limit_count: `44`
+- functions_over_limit_count: `45`
 - production_classes_over_limit: `9`
-- production_functions_over_limit: `44`
+- production_functions_over_limit: `45`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `6`
 - v3_gate_status: `pass`
@@ -15,7 +15,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `44`
+- functions_over_150_lines: `45`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `85`
@@ -48,7 +48,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 13 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 44 | advisory |
+| `functions_over_150_lines` | 45 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -362,6 +362,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.lean_radar.dashboard_render` | `_today` | 170 | false |
 | `crypto_rsi_scanner.lean_radar.dashboard_render` | `_health` | 162 | false |
 | `crypto_rsi_scanner.lean_radar.health` | `refresh_system_health` | 304 | true |
-| `crypto_rsi_scanner.lean_radar.market_data` | `fetch_live_market_rows` | 200 | true |
-| `crypto_rsi_scanner.lean_radar.scan` | `run_scan` | 263 | true |
+| `crypto_rsi_scanner.lean_radar.market_data` | `fetch_live_market_rows` | 229 | true |
+| `crypto_rsi_scanner.lean_radar.market_data` | `fetch_live_market_rows.collect` | 176 | true |
+| `crypto_rsi_scanner.lean_radar.scan` | `run_scan` | 269 | true |
 | `crypto_rsi_scanner.lean_radar.universe` | `build_universe` | 218 | true |
