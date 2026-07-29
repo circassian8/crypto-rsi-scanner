@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-29 — Preserve Lean live-provider failure telemetry · Codex
+**Why:** The first genuine Lean no-send cycle failed after crossing the bounded
+CoinGecko boundary, but the persisted scan receipt collapsed the cause to a
+generic message and discarded the client's already-sanitized request telemetry.
+That made a safe operational failure unnecessarily opaque.
+**Changes:** Lean market acquisition errors now carry bounded, secret-free
+failure telemetry: provider/stage/ordinal, completed request ledger, exact call
+count, last HTTP status/retry/duration/error class, and a validation-versus-
+transport classification. The scan health record preserves that telemetry
+without persisting response bodies or exception text. The live SQLite lock file
+is now explicitly ignored as machine-local runtime state. Added regressions for
+a second-page HTTP failure and end-to-end scan-health persistence.
+**Verify:** Focused operational-pilot and scan-engine tests pass 31/31;
+`make lean-radar-verify PYTHON=.venv/bin/python` passes 145 tests, compileall,
+and all six dashboard pages; `git diff --check` passes.
+**Notes/risks:** The operator supplied a fresh complete official Bybit catalog;
+767 raw rows normalized to 663 confirmed active USDT perpetuals. The first
+CoinGecko cycle remained fail-closed with zero snapshots, ideas, messages,
+sends, trades, orders, paper trades, RSI writes, or `TRIGGERED_FADE`. Cadence
+prevents another provider attempt before `2026-07-29T11:40:09.641342+00:00`.
+
 ## 2026-07-24 — Honor the selected Python in the review export · Codex
 **Why:** The post-push Operational Pilot review export exposed that
 `export-src-with-artifacts` still forced bare Homebrew `python3`, so it failed

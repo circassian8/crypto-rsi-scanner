@@ -615,6 +615,37 @@ def test_provider_failure_is_recorded_truthfully_and_throttles_retry(
     assert called is False
 
 
+def test_provider_failure_persists_sanitized_market_telemetry(tmp_path: Path) -> None:
+    store = _store(tmp_path, source_mode="imported_catalog")
+    settings = LeanRadarSettings(db_path=store.path, cadence_minutes=20)
+    telemetry = {
+        "schema_version": "lean_market_acquisition_failure_v1",
+        "provider": "coingecko",
+        "failure_class": "provider_request_failed",
+        "last_request": {
+            "endpoint_path": "/coins/markets",
+            "http_status": 403,
+            "error_class": "http_error",
+        },
+    }
+
+    def failing_provider() -> tuple[tuple[Mapping[str, object], ...], Mapping[str, object]]:
+        raise MarketDataError("live market collection failed", telemetry=telemetry)
+
+    failed = run_scan(
+        store,
+        settings,
+        source_mode="live_no_send",
+        environ={"RSI_EVENT_DISCOVERY_UNIVERSE_LIVE": "1"},
+        provider=failing_provider,
+        evaluated_at=NOW,
+    )
+
+    assert failed["status"] == "provider_failed"
+    assert failed["provider_telemetry"] == telemetry
+    assert store.last_scan_status() == failed
+
+
 def test_invalid_provider_evidence_records_successful_call_without_hiding_last_ideas(
     tmp_path: Path,
 ) -> None:

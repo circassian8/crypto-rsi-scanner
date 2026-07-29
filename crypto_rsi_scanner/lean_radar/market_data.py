@@ -35,6 +35,15 @@ _COINGECKO_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,127}$")
 class _MarketDataError(ValueError):
     """Raised when market input cannot be interpreted without guessing units."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        telemetry: Mapping[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.telemetry = dict(telemetry or {})
+
 
 MarketDataError = _MarketDataError
 
@@ -97,107 +106,136 @@ def fetch_live_market_rows(
         targeted_rows: list[Mapping[str, object]] = []
         seen_ranked_ids: set[str] = set()
         request_ledger: list[dict[str, object]] = []
+        request_type: str | None = None
+        request_ordinal: int | None = None
+        request_recorded = False
         exhausted = False
         eligible_count = 0
-        async with client:
-            for page in range(1, max_ranked_pages + 1):
-                page_rows = await _request_market_rows(
-                    client,
-                    {
-                        "vs_currency": "usd",
-                        "order": "volume_desc",
-                        "per_page": page_size,
-                        "page": page,
-                        "sparkline": "true",
-                        "price_change_percentage": "1h,24h,7d",
-                    },
-                )
-                request_ledger.append(
-                    _request_receipt(
-                        client.last_request_telemetry,
-                        request_type="ranked_page",
-                        ordinal=page,
-                        result_count=len(page_rows),
-                    )
-                )
-                for raw in page_rows:
-                    canonical_id = _row_id(raw)
-                    if canonical_id in seen_ranked_ids:
-                        raise MarketDataError(
-                            "CoinGecko ranked pages contain a duplicate asset identity"
-                        )
-                    seen_ranked_ids.add(canonical_id)
-                    ranked_rows.append(
-                        {**dict(raw), "_lean_acquisition_origin": "ranked"}
-                    )
-                try:
-                    eligible_count = build_universe(
-                        ranked_rows,
-                        instruments,
-                        (),
-                        limit=target_count,
-                    ).eligible_ranked_count
-                except LeanUniverseError as exc:
-                    raise MarketDataError(
-                        "CoinGecko ranked market rows failed universe validation"
-                    ) from exc
-                if eligible_count >= target_count:
-                    break
-                if len(page_rows) < page_size:
-                    exhausted = True
-                    break
-
-            missing_watchlist = tuple(
-                asset_id
-                for asset_id in requested_watchlist_ids
-                if asset_id not in seen_ranked_ids
-            )
-            bounded_watchlist = missing_watchlist[:MAX_WATCHLIST_IDS]
-            seen_targeted: set[str] = set()
-            for batch_number, offset in enumerate(
-                range(0, len(bounded_watchlist), WATCHLIST_BATCH_SIZE),
-                start=1,
-            ):
-                batch = bounded_watchlist[offset : offset + WATCHLIST_BATCH_SIZE]
-                page_rows = await _request_market_rows(
-                    client,
-                    {
-                        "vs_currency": "usd",
-                        "ids": ",".join(batch),
-                        "order": "volume_desc",
-                        "per_page": len(batch),
-                        "page": 1,
-                        "sparkline": "true",
-                        "price_change_percentage": "1h,24h,7d",
-                    },
-                )
-                request_ledger.append(
-                    _request_receipt(
-                        client.last_request_telemetry,
-                        request_type="targeted_watchlist",
-                        ordinal=batch_number,
-                        result_count=len(page_rows),
-                        requested_ids=batch,
-                    )
-                )
-                allowed = set(batch)
-                for raw in page_rows:
-                    canonical_id = _row_id(raw)
-                    if (
-                        canonical_id not in allowed
-                        or canonical_id in seen_ranked_ids
-                        or canonical_id in seen_targeted
-                    ):
-                        raise MarketDataError(
-                            "CoinGecko targeted response identity is inconsistent"
-                        )
-                    seen_targeted.add(canonical_id)
-                    targeted_rows.append(
+        try:
+            async with client:
+                for page in range(1, max_ranked_pages + 1):
+                    request_type = "ranked_page"
+                    request_ordinal = page
+                    request_recorded = False
+                    page_rows = await _request_market_rows(
+                        client,
                         {
-                            **dict(raw),
-                            "_lean_acquisition_origin": "targeted_watchlist",
-                        }
+                            "vs_currency": "usd",
+                            "order": "volume_desc",
+                            "per_page": page_size,
+                            "page": page,
+                            "sparkline": "true",
+                            "price_change_percentage": "1h,24h,7d",
+                        },
                     )
+                    request_ledger.append(
+                        _request_receipt(
+                            client.last_request_telemetry,
+                            request_type=request_type,
+                            ordinal=page,
+                            result_count=len(page_rows),
+                        )
+                    )
+                    request_recorded = True
+                    for raw in page_rows:
+                        canonical_id = _row_id(raw)
+                        if canonical_id in seen_ranked_ids:
+                            raise MarketDataError(
+                                "CoinGecko ranked pages contain a duplicate asset identity"
+                            )
+                        seen_ranked_ids.add(canonical_id)
+                        ranked_rows.append(
+                            {**dict(raw), "_lean_acquisition_origin": "ranked"}
+                        )
+                    try:
+                        eligible_count = build_universe(
+                            ranked_rows,
+                            instruments,
+                            (),
+                            limit=target_count,
+                        ).eligible_ranked_count
+                    except LeanUniverseError as exc:
+                        raise MarketDataError(
+                            "CoinGecko ranked market rows failed universe validation"
+                        ) from exc
+                    if eligible_count >= target_count:
+                        break
+                    if len(page_rows) < page_size:
+                        exhausted = True
+                        break
+
+                missing_watchlist = tuple(
+                    asset_id
+                    for asset_id in requested_watchlist_ids
+                    if asset_id not in seen_ranked_ids
+                )
+                bounded_watchlist = missing_watchlist[:MAX_WATCHLIST_IDS]
+                seen_targeted: set[str] = set()
+                for batch_number, offset in enumerate(
+                    range(0, len(bounded_watchlist), WATCHLIST_BATCH_SIZE),
+                    start=1,
+                ):
+                    batch = bounded_watchlist[offset : offset + WATCHLIST_BATCH_SIZE]
+                    request_type = "targeted_watchlist"
+                    request_ordinal = batch_number
+                    request_recorded = False
+                    page_rows = await _request_market_rows(
+                        client,
+                        {
+                            "vs_currency": "usd",
+                            "ids": ",".join(batch),
+                            "order": "volume_desc",
+                            "per_page": len(batch),
+                            "page": 1,
+                            "sparkline": "true",
+                            "price_change_percentage": "1h,24h,7d",
+                        },
+                    )
+                    request_ledger.append(
+                        _request_receipt(
+                            client.last_request_telemetry,
+                            request_type=request_type,
+                            ordinal=batch_number,
+                            result_count=len(page_rows),
+                            requested_ids=batch,
+                        )
+                    )
+                    request_recorded = True
+                    allowed = set(batch)
+                    for raw in page_rows:
+                        canonical_id = _row_id(raw)
+                        if (
+                            canonical_id not in allowed
+                            or canonical_id in seen_ranked_ids
+                            or canonical_id in seen_targeted
+                        ):
+                            raise MarketDataError(
+                                "CoinGecko targeted response identity is inconsistent"
+                            )
+                        seen_targeted.add(canonical_id)
+                        targeted_rows.append(
+                            {
+                                **dict(raw),
+                                "_lean_acquisition_origin": "targeted_watchlist",
+                            }
+                        )
+        except Exception as exc:
+            if isinstance(exc, MarketDataError) and exc.telemetry:
+                raise
+            failure = _failure_telemetry(
+                client.last_request_telemetry,
+                request_ledger=request_ledger,
+                request_type=request_type,
+                ordinal=request_ordinal,
+                request_recorded=request_recorded,
+                validation_failure=isinstance(exc, MarketDataError),
+            )
+            message = (
+                str(exc)
+                if isinstance(exc, MarketDataError)
+                else "live market collection failed"
+            )
+            raise MarketDataError(message, telemetry=failure) from exc
         page_budget_reached = (
             eligible_count < target_count
             and not exhausted
@@ -321,6 +359,45 @@ def _request_receipt(
             }
         )
     return receipt
+
+
+def _failure_telemetry(
+    last_request: Mapping[str, object] | None,
+    *,
+    request_ledger: Sequence[Mapping[str, object]],
+    request_type: str | None,
+    ordinal: int | None,
+    request_recorded: bool,
+    validation_failure: bool,
+) -> dict[str, object]:
+    """Return bounded, secret-free truth for one failed acquisition attempt."""
+
+    last = last_request or {}
+    attempted_unrecorded = bool(request_type and last and not request_recorded)
+    return {
+        "schema_version": "lean_market_acquisition_failure_v1",
+        "provider": "coingecko",
+        "endpoint_path": "/coins/markets",
+        "failure_class": (
+            "market_data_validation"
+            if validation_failure
+            else "provider_request_failed"
+        ),
+        "failure_stage": request_type or "client_setup",
+        "failure_ordinal": ordinal,
+        "provider_call_count": len(request_ledger) + int(attempted_unrecorded),
+        "completed_request_count": len(request_ledger),
+        "request_recorded_before_failure": request_recorded,
+        "request_ledger": [dict(row) for row in request_ledger],
+        "last_request": {
+            "endpoint_path": last.get("endpoint_path"),
+            "http_status": last.get("http_status"),
+            "retry_count": last.get("retry_count", 0),
+            "duration_ms": last.get("duration_ms"),
+            "error_class": last.get("error_class"),
+        },
+        "research_only": True,
+    }
 
 
 def normalize_snapshots(

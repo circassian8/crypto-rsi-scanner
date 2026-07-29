@@ -144,7 +144,12 @@ def run_scan(
                 )
             else:
                 materialized, telemetry = provider()
-        except Exception:
+        except Exception as exc:
+            failure_telemetry = (
+                exc.telemetry
+                if isinstance(exc, MarketDataError)
+                else {}
+            )
             health = _failed_provider_health(
                 now=now,
                 attempted_at=provider_attempted_at,
@@ -152,6 +157,7 @@ def run_scan(
                 status="provider_failed",
                 reason="live market collection failed",
                 provider_call_succeeded=False,
+                telemetry=failure_telemetry,
             )
             store.record_health("scan", health)
             return health

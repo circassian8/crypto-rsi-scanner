@@ -3,6 +3,7 @@
 
 # Runtime artifacts
 *.db
+*.db.lock
 *.db-wal
 *.db-shm
 rsi_scan_latest.csv

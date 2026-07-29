@@ -19,7 +19,10 @@ from crypto_rsi_scanner.lean_radar.maintenance import (
     service_plist_bytes,
     uninstall_maintenance,
 )
-from crypto_rsi_scanner.lean_radar.market_data import fetch_live_market_rows
+from crypto_rsi_scanner.lean_radar.market_data import (
+    MarketDataError,
+    fetch_live_market_rows,
+)
 from crypto_rsi_scanner.lean_radar.models import BybitInstrument, MarketSnapshot
 from crypto_rsi_scanner.lean_radar.scan import scan_readiness
 from crypto_rsi_scanner.lean_radar.store import (
@@ -200,6 +203,61 @@ def test_live_collection_reports_true_provider_exhaustion(
     assert telemetry["ranked_page_budget_reached"] is False
     assert telemetry["eligible_ranked_count"] == 2
     assert universe.ranked_completion_status == "provider_exhausted_shortfall"
+
+
+def test_live_collection_failure_retains_only_sanitized_bounded_telemetry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_page = [_market_row(index, f"X{index:03d}") for index in range(250)]
+
+    class FailingCoinGecko(_FakeCoinGecko):
+        async def _get(
+            self,
+            path: str,
+            params: dict[str, object],
+        ) -> list[Mapping[str, object]]:
+            page = int(params["page"])
+            if page == 1:
+                self.last_request_telemetry = {
+                    "endpoint_path": path,
+                    "http_status": 200,
+                    "retry_count": 0,
+                    "duration_ms": 2,
+                    "error_class": None,
+                }
+                return first_page
+            self.last_request_telemetry = {
+                "endpoint_path": path,
+                "http_status": 403,
+                "retry_count": 0,
+                "duration_ms": 3,
+                "error_class": "http_error",
+            }
+            raise RuntimeError("untrusted response body with token=do-not-persist")
+
+    monkeypatch.setattr(market_data, "CoinGeckoClient", FailingCoinGecko)
+    monkeypatch.setattr("crypto_rsi_scanner.config.FIXTURE_DIR", None)
+
+    with pytest.raises(MarketDataError) as caught:
+        fetch_live_market_rows(
+            instruments=(_instrument("X000"),),
+            environ={"RSI_EVENT_DISCOVERY_UNIVERSE_LIVE": "1"},
+        )
+
+    telemetry = caught.value.telemetry
+    assert telemetry["failure_class"] == "provider_request_failed"
+    assert telemetry["failure_stage"] == "ranked_page"
+    assert telemetry["failure_ordinal"] == 2
+    assert telemetry["provider_call_count"] == 2
+    assert telemetry["completed_request_count"] == 1
+    assert telemetry["last_request"] == {
+        "endpoint_path": "/coins/markets",
+        "http_status": 403,
+        "retry_count": 0,
+        "duration_ms": 3,
+        "error_class": "http_error",
+    }
+    assert "do-not-persist" not in str(telemetry)
 
 
 def test_catalog_freshness_warns_then_blocks_without_calling_provider(
